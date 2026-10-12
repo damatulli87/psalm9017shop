@@ -32,7 +32,7 @@ function Tile({ label, value, sub }: { label: string; value: string; sub?: strin
   return (
     <div className="panel p-5">
       <div className="label-dim">{label}</div>
-      <div className="text-3xl font-bold mt-2 neon-text">{value}</div>
+      <div className="text-2xl font-semibold mt-2">{value}</div>
       {sub && <div className="text-xs text-[var(--text-dim)] mt-1">{sub}</div>}
     </div>
   );

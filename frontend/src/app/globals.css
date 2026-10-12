@@ -1,47 +1,65 @@
 @import "tailwindcss";
 
 /*
- * Modern dark SaaS palette (zinc/slate neutrals, not pure black), a single
- * restrained accent color, and soft elevation instead of neon glow. Class
- * names (panel, chip, btn-neon, neon-text, status-dot, feed-line, conduit)
- * are kept stable from the earlier terminal-themed version so page files
- * didn't need touching -- only what these classes render changed.
+ * Design discipline, stated explicitly so it doesn't erode over edits:
+ * - Gold is reserved for ONE thing per screen -- the primary action, the
+ *   active nav item, or a single highlighted status. It is NOT the default
+ *   color for headings, numbers, or icons. Most of the UI is neutral warm
+ *   gray/white.
+ * - No emoji, anywhere. Icons are lucide-react, 16-18px, single-color
+ *   (currentColor), used sparingly -- not every card needs an icon.
+ * - Serif (the wordmark font) appears ONLY on the brand name itself. Page
+ *   headings are plain sans-serif, same weight discipline as the rest of
+ *   the UI, not a special treatment.
+ * - Prefer whitespace and typographic hierarchy over boxing everything in
+ *   its own bordered card.
  */
 :root {
-  --bg: #0a0a0d;
-  --surface: #131317;
-  --surface-raised: #1a1b20;
-  --surface-hover: #202126;
-  --border: #26272e;
-  --border-soft: #1c1d23;
+  --bg: #0c0a08;
+  --surface: #16130f;
+  --surface-raised: #1e1a14;
+  --surface-hover: #26211a;
+  --border: #2b251c;
+  --border-soft: #1f1b15;
 
-  --text: #f4f4f6;
-  --text-dim: #9a9ba6;
-  --text-faint: #6b6c76;
+  --text: #f1ede3;
+  --text-dim: #9c9281;
+  --text-faint: #6b6253;
 
-  --accent: #10b981;
-  --accent-strong: #34d399;
-  --accent-soft: rgba(16, 185, 129, 0.14);
-  --accent-border: rgba(16, 185, 129, 0.35);
+  --accent: #c9a227;
+  --accent-strong: #e8c158;
+  --accent-soft: rgba(201, 162, 39, 0.12);
+  --accent-border: rgba(201, 162, 39, 0.32);
 
-  --blue: #3b82f6;
-  --blue-strong: #60a5fa;
-  --blue-soft: rgba(59, 130, 246, 0.14);
-  --blue-border: rgba(59, 130, 246, 0.35);
+  /* Semantic "good/complete/connected" status -- deliberately NOT gold, so
+     gold stays reserved for brand/primary-action moments only (sidebar
+     active state, buttons, wordmark). A muted sage reads calm and natural
+     rather than decorative. */
+  --success: #8a9a6f;
+  --success-strong: #a8ba8c;
+  --success-soft: rgba(138, 154, 111, 0.12);
+  --success-border: rgba(138, 154, 111, 0.3);
 
-  --amber: #f59e0b;
-  --amber-strong: #fbbf24;
-  --amber-soft: rgba(245, 158, 11, 0.12);
-  --amber-border: rgba(245, 158, 11, 0.32);
+  --blue: #6c93c7;
+  --blue-strong: #8fb0dd;
+  --blue-soft: rgba(108, 147, 199, 0.12);
+  --blue-border: rgba(108, 147, 199, 0.3);
 
-  --danger: #f87171;
-  --danger-soft: rgba(248, 113, 113, 0.12);
-  --danger-border: rgba(248, 113, 113, 0.32);
+  --amber: #b5793a;
+  --amber-strong: #d1964f;
+  --amber-soft: rgba(181, 121, 58, 0.12);
+  --amber-border: rgba(181, 121, 58, 0.3);
 
-  /* legacy aliases so existing component CSS below stays readable */
-  --neon: var(--accent-strong);
-  --neon-dim: var(--accent);
-  --neon-glow: var(--accent-soft);
+  --danger: #c4756e;
+  --danger-soft: rgba(196, 117, 110, 0.12);
+  --danger-border: rgba(196, 117, 110, 0.3);
+
+  /* legacy aliases so existing component CSS below stays readable --
+     "neon" historically meant "the good/success color" in this codebase,
+     so it maps to the semantic success tone, not the brand accent. */
+  --neon: var(--success-strong);
+  --neon-dim: var(--success);
+  --neon-glow: var(--success-soft);
   --warning: var(--amber);
   --bg-panel: var(--surface);
   --bg-panel-raised: var(--surface-raised);
@@ -57,6 +75,26 @@ body {
   color: var(--text);
   font-family: var(--font-sans), ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
   letter-spacing: -0.01em;
+}
+
+h1 {
+  font-weight: 600;
+  font-size: 1.375rem;
+  letter-spacing: -0.015em;
+  color: var(--text);
+}
+
+.verse {
+  font-family: var(--font-serif), Georgia, serif;
+  font-style: italic;
+  color: var(--text-dim);
+  line-height: 1.6;
+}
+
+.wordmark {
+  font-family: var(--font-serif), Georgia, serif;
+  font-weight: 600;
+  color: var(--text);
 }
 
 code, pre, .font-mono-ui {
@@ -79,40 +117,42 @@ code, pre, .font-mono-ui {
 }
 
 .panel {
-  background: linear-gradient(180deg, var(--surface) 0%, var(--surface) 100%);
+  background: var(--surface);
   border: 1px solid var(--border-soft);
-  border-radius: 16px;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 8px 24px -12px rgba(0, 0, 0, 0.5);
+  border-radius: 12px;
 }
 
 .panel-raised {
   background: var(--surface-raised);
   border: 1px solid var(--border);
-  border-radius: 14px;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+  border-radius: 10px;
 }
 
+/* Kept for API compatibility with existing page markup; no longer colors
+   text gold by default -- see design discipline note above. */
 .neon-text {
-  color: var(--accent-strong);
+  color: var(--text);
   font-weight: 600;
+}
+.neon-text.accent {
+  color: var(--accent-strong);
 }
 
 .neon-border {
   border-color: var(--border);
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 8px 24px -12px rgba(0, 0, 0, 0.6);
 }
 
 .status-dot {
   display: inline-block;
-  width: 8px;
-  height: 8px;
+  width: 6px;
+  height: 6px;
   border-radius: 50%;
 }
 .status-dot.idle {
   background: var(--text-faint);
 }
 .status-dot.working {
-  background: var(--accent-strong);
+  background: var(--blue-strong);
   animation: pulse 1.6s ease-in-out infinite;
 }
 .status-dot.error {
@@ -127,12 +167,15 @@ code, pre, .font-mono-ui {
 .btn-neon {
   background: var(--accent);
   border: 1px solid var(--accent);
-  color: #06160f;
-  padding: 0.55rem 1.1rem;
-  border-radius: 10px;
+  color: #1a1408;
+  padding: 0.5rem 1rem;
+  border-radius: 8px;
   transition: all 0.15s ease;
   font-weight: 600;
-  font-size: 0.875rem;
+  font-size: 0.8rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
 }
 .btn-neon:hover {
   background: var(--accent-strong);
@@ -147,10 +190,10 @@ code, pre, .font-mono-ui {
   background: transparent;
   border: 1px solid var(--danger-border);
   color: var(--danger);
-  padding: 0.55rem 1.1rem;
-  border-radius: 10px;
+  padding: 0.5rem 1rem;
+  border-radius: 8px;
   font-weight: 600;
-  font-size: 0.875rem;
+  font-size: 0.8rem;
   transition: all 0.15s ease;
 }
 .btn-danger:hover {
@@ -158,52 +201,52 @@ code, pre, .font-mono-ui {
 }
 
 .label-dim {
-  color: var(--text-dim);
-  font-size: 0.72rem;
+  color: var(--text-faint);
+  font-size: 0.68rem;
   text-transform: uppercase;
-  letter-spacing: 0.07em;
+  letter-spacing: 0.08em;
   font-weight: 600;
 }
 
 .grid-bg {
-  background: radial-gradient(ellipse 80% 50% at 50% -20%, rgba(16, 185, 129, 0.06), transparent);
+  background: transparent;
 }
 
 .chip {
   display: inline-flex;
   align-items: center;
-  gap: 0.35rem;
-  padding: 0.3rem 0.65rem;
-  border-radius: 999px;
+  gap: 0.3rem;
+  padding: 0.22rem 0.55rem;
+  border-radius: 6px;
   border: 1px solid transparent;
-  background: var(--surface-raised);
+  background: transparent;
   color: var(--text-dim);
-  font-size: 0.72rem;
+  font-size: 0.68rem;
   font-weight: 500;
 }
-.chip.chip-neon { background: var(--accent-soft); color: var(--accent-strong); }
-.chip.chip-amber { background: var(--amber-soft); color: var(--amber-strong); }
-.chip.chip-blue { background: var(--blue-soft); color: var(--blue-strong); }
-.chip.chip-dim { background: var(--surface-raised); color: var(--text-dim); }
-.chip.chip-danger { background: var(--danger-soft); color: var(--danger); }
+.chip.chip-neon { color: var(--success-strong); background: var(--success-soft); }
+.chip.chip-amber { color: var(--amber-strong); background: var(--amber-soft); }
+.chip.chip-blue { color: var(--blue-strong); background: var(--blue-soft); }
+.chip.chip-dim { color: var(--text-faint); background: var(--surface-raised); }
+.chip.chip-danger { color: var(--danger); background: var(--danger-soft); }
 
 .feed-line {
-  border-left: 2px solid var(--border);
+  border-left: 1px solid var(--border);
   padding-left: 0.65rem;
   position: relative;
 }
 .feed-line::before {
   content: "";
   position: absolute;
-  left: -5px;
-  top: 0.35rem;
-  width: 8px;
-  height: 8px;
+  left: -4px;
+  top: 0.4rem;
+  width: 7px;
+  height: 7px;
   border-radius: 50%;
   background: var(--text-faint);
 }
-.feed-line.feed-success::before { background: var(--accent-strong); }
-.feed-line.feed-warn::before { background: var(--amber); }
+.feed-line.feed-success::before { background: var(--success-strong); }
+.feed-line.feed-warn::before { background: var(--amber-strong); }
 .feed-line.feed-error::before { background: var(--danger); }
 
 @keyframes flow {
@@ -218,41 +261,27 @@ code, pre, .font-mono-ui {
   opacity: 0.35;
 }
 
-/* ---------------- Factory Floor: premium illustrated variant ---------------- */
+/* ---------------- Factory Floor: restrained line-icon variant ---------------- */
 
 .room-floor-bg {
   background: transparent;
 }
 
 .room-card {
-  background: var(--surface-raised);
-  border: 1px solid var(--border);
-  border-radius: 20px;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.25), 0 12px 28px -16px rgba(0, 0, 0, 0.55);
-  transition: border-color 0.35s ease, box-shadow 0.35s ease, transform 0.2s ease;
-}
-.room-card.room-active {
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.25), 0 16px 32px -14px rgba(16, 185, 129, 0.25);
+  background: var(--surface);
+  border: 1px solid var(--border-soft);
+  border-radius: 10px;
+  transition: border-color 0.3s ease;
 }
 .room-card.room-planned {
-  background: repeating-linear-gradient(
-    135deg,
-    var(--surface) 0px,
-    var(--surface) 10px,
-    var(--surface-raised) 10px,
-    var(--surface-raised) 20px
-  );
+  border-style: dashed;
 }
 
 .icon-badge {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 34px;
-  height: 34px;
-  border-radius: 11px;
-  font-size: 16px;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08), 0 2px 6px rgba(0, 0, 0, 0.35);
+  color: var(--text-faint);
 }
 
 .hallway-line {
@@ -260,7 +289,7 @@ code, pre, .font-mono-ui {
   transition: background 0.4s ease;
 }
 .hallway-line.hallway-active {
-  background: var(--accent-border);
+  background: var(--success-border);
 }
 
 @keyframes wander {
@@ -272,17 +301,11 @@ code, pre, .font-mono-ui {
 }
 .worker-token {
   position: absolute;
-  width: 26px;
-  height: 26px;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 14px;
-  line-height: 1;
-  border-radius: 50%;
-  background: var(--surface);
-  border: 1px solid var(--border);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.45);
+  color: var(--text-faint);
+  opacity: 0.85;
   animation: wander var(--dur, 8s) ease-in-out infinite;
   animation-delay: var(--delay, 0s);
   user-select: none;
@@ -315,16 +338,10 @@ code, pre, .font-mono-ui {
 }
 .hall-walker {
   position: absolute;
-  width: 18px;
-  height: 18px;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 11px;
-  border-radius: 50%;
-  background: var(--surface);
-  border: 1px solid var(--accent-border);
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4);
+  color: var(--success-strong);
   animation-duration: 2.6s;
   animation-timing-function: ease-in-out;
   animation-iteration-count: infinite;

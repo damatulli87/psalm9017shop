@@ -56,8 +56,8 @@ export default function MarketplacePage() {
       </div>
 
       {etsyCallback === "connected" && (
-        <div className="panel p-4 border-l-4" style={{ borderLeftColor: "var(--accent)" }}>
-          <span className="text-sm font-semibold text-[var(--accent-strong)]">Etsy connected successfully.</span>
+        <div className="panel p-4 border-l-4" style={{ borderLeftColor: "var(--success)" }}>
+          <span className="text-sm font-semibold text-[var(--success-strong)]">Etsy connected successfully.</span>
           <span className="text-xs text-[var(--text-dim)]"> New listing drafts will now be sent to Etsy for real.</span>
         </div>
       )}

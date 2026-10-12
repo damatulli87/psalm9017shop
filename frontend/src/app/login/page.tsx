@@ -28,8 +28,12 @@ export default function LoginPage() {
   return (
     <div className="flex-1 flex items-center justify-center p-6">
       <div className="panel neon-border w-full max-w-sm p-8">
-        <h1 className="text-2xl font-bold neon-text tracking-widest mb-1">Psalm 90:17</h1>
-        <p className="label-dim mb-6">Commerce Command Center</p>
+        <h1 className="wordmark text-3xl neon-text accent mb-2">Psalm 90:17</h1>
+        <p className="verse text-sm mb-1">
+          &ldquo;And let the beauty of the Lord our God be upon us, and establish thou
+          the work of our hands upon us; yea, the work of our hands establish thou it.&rdquo;
+        </p>
+        <p className="label-dim mb-6 mt-3">Commerce Command Center</p>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <label className="label-dim block mb-1">Owner Email</label>

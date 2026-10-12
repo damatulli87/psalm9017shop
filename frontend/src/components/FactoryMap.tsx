@@ -1,17 +1,36 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import {
+  Search,
+  Target,
+  ClipboardList,
+  Palette,
+  Factory,
+  CheckCircle2,
+  Tag,
+  FileCheck,
+  PackageCheck,
+  Megaphone,
+  LineChart,
+  TrendingUp,
+  Lock,
+  User,
+  ArrowRight,
+  type LucideIcon,
+} from "lucide-react";
 import { apiFetch } from "@/lib/api";
 
 /**
  * The production pipeline rendered as a literal factory floor plan: each
- * stage is a room, hallways connect them, and little workers wander inside
- * a room only while that stage has real activity. All of it -- which rooms
- * are staffed, which are idle, which are still "under construction" -- is
- * read from the most recent real WorkflowRun. Nothing here is decorative
- * fake activity; an empty system renders every room empty, honestly.
- * Worker positions wander via CSS only (randomized once per mount, not
- * re-rolled on every poll) so they drift instead of teleporting.
+ * stage is a room, hallways connect them, and a quiet presence indicator
+ * shows inside a room only while that stage has real activity. All of it --
+ * which rooms are staffed, which are idle, which are still "under
+ * construction" -- is read from the most recent real WorkflowRun. Nothing
+ * here is decorative fake activity; an empty system renders every room
+ * empty, honestly. Deliberately restrained: one small line icon per room,
+ * no color-saturated badges, no cartoon avatars -- see globals.css for the
+ * design-discipline note this follows.
  */
 
 type TaskStatus = { stage: string; agent_key: string; status: string };
@@ -24,32 +43,27 @@ const STAGE_LAYOUT: {
   col: number;
   row: number;
   zone: "core" | "planned";
-  icon: string;
-  worker: string;
+  icon: LucideIcon;
 }[] = [
-  { stage: "research", label: "Research Lab", col: 0, row: 0, zone: "core", icon: "\u{1F50E}", worker: "\u{1F9D1}‍\u{1F52C}" },
-  { stage: "opportunity_selection", label: "Selection Room", col: 1, row: 0, zone: "core", icon: "\u{1F3AF}", worker: "\u{1F9D1}‍\u{1F4BC}" },
-  { stage: "product_planning", label: "Planning Desk", col: 2, row: 0, zone: "core", icon: "\u{1F4CB}", worker: "\u{1F9D1}‍\u{1F4BB}" },
-  { stage: "creative_direction", label: "Design Studio", col: 3, row: 0, zone: "core", icon: "\u{1F3A8}", worker: "\u{1F9D1}‍\u{1F3A8}" },
-  { stage: "production", label: "Production Floor", col: 3, row: 1, zone: "core", icon: "\u{1F3ED}", worker: "\u{1F477}" },
-  { stage: "quality_assurance", label: "QA Bay", col: 2, row: 1, zone: "core", icon: "\u{1F50D}", worker: "\u{1F575}️" },
-  { stage: "listing_creation", label: "Listing Desk", col: 1, row: 1, zone: "core", icon: "\u{1F3F7}️", worker: "\u{1F9D1}‍\u{1F4BB}" },
-  { stage: "authorization", label: "Approval Office", col: 0, row: 1, zone: "core", icon: "\u{1F4DD}", worker: "\u{1F9D1}‍⚖️" },
-  { stage: "publication", label: "Shipping Dock", col: 0, row: 2, zone: "core", icon: "\u{1F4E6}", worker: "\u{1F9D1}‍✈️" },
-  { stage: "marketing", label: "Marketing Wing", col: 1, row: 2, zone: "planned", icon: "\u{1F4E3}", worker: "" },
-  { stage: "sales_monitoring", label: "Sales Watch", col: 2, row: 2, zone: "planned", icon: "\u{1F4CA}", worker: "" },
-  { stage: "optimization", label: "R&D Annex", col: 3, row: 2, zone: "planned", icon: "\u{1F4C8}", worker: "" },
+  { stage: "research", label: "Research Lab", col: 0, row: 0, zone: "core", icon: Search },
+  { stage: "opportunity_selection", label: "Selection Room", col: 1, row: 0, zone: "core", icon: Target },
+  { stage: "product_planning", label: "Planning Desk", col: 2, row: 0, zone: "core", icon: ClipboardList },
+  { stage: "creative_direction", label: "Design Studio", col: 3, row: 0, zone: "core", icon: Palette },
+  { stage: "production", label: "Production Floor", col: 3, row: 1, zone: "core", icon: Factory },
+  { stage: "quality_assurance", label: "QA Bay", col: 2, row: 1, zone: "core", icon: CheckCircle2 },
+  { stage: "listing_creation", label: "Listing Desk", col: 1, row: 1, zone: "core", icon: Tag },
+  { stage: "authorization", label: "Approval Office", col: 0, row: 1, zone: "core", icon: FileCheck },
+  { stage: "publication", label: "Shipping Dock", col: 0, row: 2, zone: "core", icon: PackageCheck },
+  { stage: "marketing", label: "Marketing Wing", col: 1, row: 2, zone: "planned", icon: Megaphone },
+  { stage: "sales_monitoring", label: "Sales Watch", col: 2, row: 2, zone: "planned", icon: LineChart },
+  { stage: "optimization", label: "R&D Annex", col: 3, row: 2, zone: "planned", icon: TrendingUp },
 ];
 
 const ROOM_W = 190;
-const ROOM_H = 132;
-const GAP = 56;
-const HALL = 3;
+const ROOM_H = 118;
+const GAP = 52;
+const HALL = 2;
 const PAD = 24;
-// Secondary worker shown alongside the room's thematic specialist when a
-// stage is actively running (busier-looking than a single completed stage).
-const HELPER_EMOJI = ["\u{1F9D1}", "\u{1F469}", "\u{1F468}"];
-const HANDOFF_ITEM = "\u{1F4E6}";
 
 function roomPos(col: number, row: number) {
   return { x: PAD + col * (ROOM_W + GAP), y: PAD + row * (ROOM_H + GAP) };
@@ -57,53 +71,21 @@ function roomPos(col: number, row: number) {
 
 function statusVisual(status: string | undefined, zone: "core" | "planned") {
   if (zone === "planned") {
-    return {
-      iconBg: "linear-gradient(135deg, #2a2117 0%, #1a1611 100%)",
-      label: "var(--text-faint)",
-      pill: "chip-amber",
-      workers: 0,
-      active: false,
-    };
+    return { iconColor: "var(--text-faint)", labelColor: "var(--text-faint)", pill: "chip-dim", present: false };
   }
   switch (status) {
     case "completed":
     case "published":
     case "published_simulated":
-      return {
-        iconBg: "linear-gradient(135deg, var(--accent) 0%, #059669 100%)",
-        label: "var(--text)",
-        pill: "chip-neon",
-        workers: 1,
-        active: true,
-      };
+      return { iconColor: "var(--success-strong)", labelColor: "var(--text)", pill: "chip-neon", present: true };
     case "running":
-      return {
-        iconBg: "linear-gradient(135deg, var(--blue) 0%, #2563eb 100%)",
-        label: "var(--text)",
-        pill: "chip-blue",
-        workers: 2,
-        active: true,
-      };
+      return { iconColor: "var(--blue-strong)", labelColor: "var(--text)", pill: "chip-blue", present: true };
     case "failed":
-      return {
-        iconBg: "linear-gradient(135deg, var(--danger) 0%, #dc2626 100%)",
-        label: "var(--text)",
-        pill: "chip-dim",
-        workers: 0,
-        active: false,
-      };
+      return { iconColor: "var(--danger)", labelColor: "var(--text)", pill: "chip-danger", present: false };
     default:
-      return {
-        iconBg: "linear-gradient(135deg, var(--surface-hover) 0%, var(--surface) 100%)",
-        label: "var(--text-dim)",
-        pill: "chip-dim",
-        workers: 0,
-        active: false,
-      };
+      return { iconColor: "var(--text-faint)", labelColor: "var(--text-dim)", pill: "chip-dim", present: false };
   }
 }
-
-type WorkerSeed = { p1x: number; p1y: number; p2x: number; p2y: number; p3x: number; p3y: number; dur: number; delay: number; emoji: string };
 
 export default function FactoryMap() {
   const [taskMap, setTaskMap] = useState<Record<string, string>>({});
@@ -135,26 +117,7 @@ export default function FactoryMap() {
     };
   }, []);
 
-  // Randomized once per mount so workers drift smoothly instead of
-  // re-teleporting every time the 6s poll refreshes stage status.
-  const workerSeeds = useMemo(() => {
-    const bound = Math.min(ROOM_W, ROOM_H) / 2 - 26;
-    const rand = (n: number) => Math.round((Math.random() * 2 - 1) * n);
-    const seeds: Record<string, WorkerSeed[]> = {};
-    for (const s of STAGE_LAYOUT) {
-      seeds[s.stage] = Array.from({ length: 2 }, (_, i) => ({
-        p1x: rand(bound), p1y: rand(bound),
-        p2x: rand(bound), p2y: rand(bound),
-        p3x: rand(bound), p3y: rand(bound),
-        dur: 7 + Math.random() * 5,
-        delay: Math.random() * 3,
-        emoji: i === 0 ? s.worker : HELPER_EMOJI[(i + s.label.length) % HELPER_EMOJI.length],
-      }));
-    }
-    return seeds;
-  }, []);
-
-  // Stable per-hallway animation delay so handoff walkers don't all march in lockstep.
+  // Stable per-hallway animation delay so handoff markers don't all march in lockstep.
   const hallwayDelays = useMemo(
     () => Object.fromEntries(STAGE_LAYOUT.map((s) => [s.stage, Math.random() * 1.8])),
     []
@@ -175,9 +138,6 @@ export default function FactoryMap() {
       orientation === "horiz"
         ? { left: Math.min(pa.x, pb.x) + ROOM_W, top: pa.y + ROOM_H / 2 - HALL / 2, width: GAP, height: HALL }
         : { left: pa.x + ROOM_W / 2 - HALL / 2, top: Math.min(pa.y, pb.y) + ROOM_H, width: HALL, height: GAP };
-    // Reversed for a right-to-left or bottom-to-top leg of the snake layout,
-    // so the handoff walker always visibly travels from the finished room
-    // toward the next one rather than backwards.
     const reversed = orientation === "horiz" ? pb.x < pa.x : pb.y < pa.y;
     return { key: `${a.stage}-${b.stage}`, fromStage: a.stage, style, active, orientation, reversed };
   });
@@ -186,7 +146,7 @@ export default function FactoryMap() {
     <div className="panel p-6">
       <div className="flex items-center justify-between mb-5">
         <div>
-          <h2 className="font-semibold text-[15px]">Factory Floor</h2>
+          <h2 className="font-semibold text-[14px]">Factory Floor</h2>
           <p className="text-xs text-[var(--text-faint)] mt-0.5">Live view of the production pipeline</p>
         </div>
         <span className="chip chip-dim">{runLabel}</span>
@@ -195,30 +155,22 @@ export default function FactoryMap() {
       <div className="overflow-x-auto pb-2">
         <div className="relative" style={{ width, height, minWidth: width }}>
           {hallways.map((h) => {
-            // The walker's CSS keyframes move it with percentage top/left, which
-            // resolve against THIS wrapper's own box -- so the wrapper must have
-            // an explicit, correctly-sized width/height (not just "absolute" with
-            // no dimensions), or the percentages resolve against an indeterminate
-            // containing block and the walker ends up positioned nonsensically.
             const wrap =
               h.orientation === "horiz"
-                ? { left: h.style.left, top: h.style.top - 8, width: h.style.width, height: h.style.height + 16 }
-                : { left: h.style.left - 8, top: h.style.top, width: h.style.width + 16, height: h.style.height };
+                ? { left: h.style.left, top: h.style.top - 7, width: h.style.width, height: h.style.height + 14 }
+                : { left: h.style.left - 7, top: h.style.top, width: h.style.width + 14, height: h.style.height };
             const lineInset =
-              h.orientation === "horiz" ? { left: 0, top: 8, width: wrap.width, height: HALL } : { left: 8, top: 0, width: HALL, height: wrap.height };
+              h.orientation === "horiz" ? { left: 0, top: 7, width: wrap.width, height: HALL } : { left: 7, top: 0, width: HALL, height: wrap.height };
 
             return (
               <div key={h.key} className="absolute" style={wrap}>
-                <div
-                  className={`absolute rounded-full hallway-line ${h.active ? "hallway-active" : ""}`}
-                  style={lineInset}
-                />
+                <div className={`absolute hallway-line ${h.active ? "hallway-active" : ""}`} style={lineInset} />
                 {h.active && (
                   <span
                     className={`hall-walker ${h.orientation} ${h.reversed ? "reversed" : ""}`}
                     style={{ animationDelay: `${hallwayDelays[h.fromStage] ?? 0}s` }}
                   >
-                    {HANDOFF_ITEM}
+                    <ArrowRight size={11} strokeWidth={2} />
                   </span>
                 )}
               </div>
@@ -229,60 +181,40 @@ export default function FactoryMap() {
             const status = room.stage === currentStage ? "running" : taskMap[room.stage];
             const v = statusVisual(status, room.zone);
             const pos = roomPos(room.col, room.row);
-            const seeds = workerSeeds[room.stage] || [];
-            const activeWorkers = seeds.slice(0, v.workers);
+            const Icon = room.icon;
 
             return (
               <div
                 key={room.stage}
-                className={`absolute room-card p-3.5 ${v.active ? "room-active" : ""} ${
-                  room.zone === "planned" ? "room-planned" : ""
-                }`}
+                className={`absolute room-card p-3.5 ${room.zone === "planned" ? "room-planned" : ""}`}
                 style={{ left: pos.x, top: pos.y, width: ROOM_W, height: ROOM_H, overflow: "hidden" }}
               >
                 <div className="flex items-start justify-between">
-                  <div className="icon-badge" style={{ background: v.iconBg }}>
-                    {room.icon}
-                  </div>
-                  <span className={`chip ${v.pill} !text-[9px] !py-0.5 !px-2`}>
+                  <Icon size={17} strokeWidth={1.6} color={v.iconColor} />
+                  <span className={`chip ${v.pill} !text-[9px] !py-0.5 !px-1.5`}>
                     {room.zone === "planned" ? "planned" : status || "idle"}
                   </span>
                 </div>
-                <div className="text-[13px] font-semibold mt-2.5" style={{ color: v.label }}>
+                <div className="text-[13px] font-medium mt-2.5" style={{ color: v.labelColor }}>
                   {room.label}
                 </div>
 
                 {room.zone === "planned" ? (
                   <div className="text-[10px] text-[var(--text-faint)] mt-1 flex items-center gap-1">
-                    <span>{"\u{1F6A7}"}</span> not yet built
+                    <Lock size={10} strokeWidth={1.75} />
+                    not yet built
                   </div>
-                ) : activeWorkers.length === 0 ? (
-                  <div className="text-[10px] text-[var(--text-faint)] mt-1">Idle</div>
                 ) : (
-                  <div className="text-[10px] text-[var(--text-dim)] mt-1">
-                    {v.workers === 2 ? "In progress" : "Completed"}
+                  <div className="text-[10px] text-[var(--text-faint)] mt-1">
+                    {status === "running" ? "In progress" : status === "failed" ? "Failed" : v.present ? "Completed" : "Idle"}
                   </div>
                 )}
 
-                {activeWorkers.map((w, i) => (
-                  <span
-                    key={i}
-                    className="worker-token"
-                    style={
-                      {
-                        left: "62%",
-                        top: "68%",
-                        "--p1x": `${w.p1x}px`, "--p1y": `${w.p1y}px`,
-                        "--p2x": `${w.p2x}px`, "--p2y": `${w.p2y}px`,
-                        "--p3x": `${w.p3x}px`, "--p3y": `${w.p3y}px`,
-                        "--dur": `${w.dur}s`,
-                        "--delay": `${w.delay}s`,
-                      } as React.CSSProperties
-                    }
-                  >
-                    {w.emoji}
-                  </span>
-                ))}
+                {v.present && (
+                  <div className="absolute bottom-3 right-3 opacity-60">
+                    <User size={13} strokeWidth={1.75} color={v.iconColor} />
+                  </div>
+                )}
               </div>
             );
           })}
@@ -293,7 +225,9 @@ export default function FactoryMap() {
         <span className="chip chip-neon">Completed</span>
         <span className="chip chip-blue">Active now</span>
         <span className="chip chip-dim">Idle</span>
-        <span className="chip chip-amber">{"\u{1F6A7}"} Not yet built</span>
+        <span className="chip chip-dim">
+          <Lock size={10} strokeWidth={1.75} /> Not yet built
+        </span>
       </div>
     </div>
   );

@@ -3,20 +3,34 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
+import {
+  LayoutDashboard,
+  ShieldCheck,
+  Workflow,
+  Rocket,
+  Package,
+  Store,
+  Wallet,
+  CheckSquare,
+  Activity,
+  MessageSquare,
+  Settings,
+  type LucideIcon,
+} from "lucide-react";
 import { clearToken, getToken } from "@/lib/api";
 
-const NAV = [
-  { href: "/dashboard", label: "Dashboard", glyph: "\u{1F4CA}" },
-  { href: "/oversight", label: "Psalm 90:17 Oversight", glyph: "\u{1F6E1}️" },
-  { href: "/agents", label: "Agent Network", glyph: "\u{1F9E9}" },
-  { href: "/missions", label: "Mission Control", glyph: "\u{1F680}" },
-  { href: "/products", label: "Product Factory", glyph: "\u{1F4E6}" },
-  { href: "/marketplace", label: "Marketplace", glyph: "\u{1F6D2}" },
-  { href: "/financials", label: "Financials", glyph: "\u{1F4B0}" },
-  { href: "/approvals", label: "Approvals", glyph: "✅" },
-  { href: "/activity", label: "Activity", glyph: "\u{1F4E1}" },
-  { href: "/chat", label: "AI Chat", glyph: "\u{1F4AC}" },
-  { href: "/settings", label: "Settings", glyph: "⚙️" },
+const NAV: { href: string; label: string; icon: LucideIcon }[] = [
+  { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
+  { href: "/oversight", label: "Psalm 90:17 Oversight", icon: ShieldCheck },
+  { href: "/agents", label: "Agent Network", icon: Workflow },
+  { href: "/missions", label: "Mission Control", icon: Rocket },
+  { href: "/products", label: "Product Factory", icon: Package },
+  { href: "/marketplace", label: "Marketplace", icon: Store },
+  { href: "/financials", label: "Financials", icon: Wallet },
+  { href: "/approvals", label: "Approvals", icon: CheckSquare },
+  { href: "/activity", label: "Activity", icon: Activity },
+  { href: "/chat", label: "AI Chat", icon: MessageSquare },
+  { href: "/settings", label: "Settings", icon: Settings },
 ];
 
 export default function HQLayout({ children }: { children: React.ReactNode }) {
@@ -37,32 +51,27 @@ export default function HQLayout({ children }: { children: React.ReactNode }) {
   return (
     <div className="flex flex-1 min-h-screen">
       <aside className="w-64 bg-[var(--surface)] border-r border-[var(--border-soft)] flex flex-col shrink-0">
-        <div className="p-5 flex items-center gap-3">
-          <div
-            className="w-9 h-9 rounded-xl flex items-center justify-center font-bold text-sm shrink-0"
-            style={{ background: "linear-gradient(135deg, var(--accent) 0%, var(--blue) 100%)", color: "#06160f" }}
-          >
-            P
+        <div className="px-5 py-6">
+          <div className="wordmark text-xl leading-none" style={{ color: "var(--accent-strong)" }}>
+            Psalm 90:17
           </div>
-          <div>
-            <div className="text-base font-bold tracking-tight">Psalm 90:17</div>
-            <div className="label-dim">Commerce OS</div>
-          </div>
+          <div className="label-dim mt-1.5">Commerce OS</div>
         </div>
-        <nav className="flex-1 overflow-y-auto px-3 py-2 space-y-0.5">
+        <nav className="flex-1 overflow-y-auto px-3 py-1 space-y-0.5">
           {NAV.map((item) => {
             const active = pathname?.startsWith(item.href);
+            const Icon = item.icon;
             return (
               <Link
                 key={item.href}
                 href={item.href}
-                className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-colors ${
+                className={`flex items-center gap-2.5 px-3 py-2 rounded-lg text-[13px] font-medium transition-colors border-l-2 ${
                   active
-                    ? "bg-[var(--accent-soft)] text-[var(--accent-strong)]"
-                    : "text-[var(--text-dim)] hover:text-[var(--text)] hover:bg-[var(--surface-hover)]"
+                    ? "text-[var(--text)] border-[var(--accent)] bg-[var(--surface-hover)]"
+                    : "text-[var(--text-dim)] border-transparent hover:text-[var(--text)] hover:bg-[var(--surface-hover)]"
                 }`}
               >
-                <span className="w-5 text-center text-base">{item.glyph}</span>
+                <Icon size={16} strokeWidth={1.75} className="shrink-0" />
                 {item.label}
               </Link>
             );

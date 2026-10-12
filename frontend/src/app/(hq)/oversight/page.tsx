@@ -21,7 +21,7 @@ const VERDICT_STYLE: Record<string, string> = {
 };
 
 function FindingRow({ f }: { f: Finding }) {
-  const color = f.status === "pass" ? "var(--accent-strong)" : f.status === "warn" ? "var(--amber)" : "var(--danger)";
+  const color = f.status === "pass" ? "var(--success-strong)" : f.status === "warn" ? "var(--amber-strong)" : "var(--danger)";
   const label = f.status === "pass" ? "PASS" : f.status === "warn" ? "WARN" : "FAIL";
   return (
     <div className="flex gap-3 py-2 border-b border-[var(--border-soft)] last:border-0">

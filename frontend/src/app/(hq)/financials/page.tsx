@@ -37,19 +37,19 @@ export default function FinancialsPage() {
       <div className="grid md:grid-cols-4 gap-4">
         <div className="panel p-5">
           <div className="label-dim">Gross Sales (ACTUAL)</div>
-          <div className="text-2xl font-bold neon-text">${report.ACTUAL.gross_sales_usd.toFixed(2)}</div>
+          <div className="text-2xl font-semibold">${report.ACTUAL.gross_sales_usd.toFixed(2)}</div>
         </div>
         <div className="panel p-5">
           <div className="label-dim">Net Revenue (ACTUAL)</div>
-          <div className="text-2xl font-bold neon-text">${report.ACTUAL.net_revenue_usd.toFixed(2)}</div>
+          <div className="text-2xl font-semibold">${report.ACTUAL.net_revenue_usd.toFixed(2)}</div>
         </div>
         <div className="panel p-5">
           <div className="label-dim">Total Expenses (ACTUAL)</div>
-          <div className="text-2xl font-bold neon-text">${report.ACTUAL.total_expenses_usd.toFixed(2)}</div>
+          <div className="text-2xl font-semibold">${report.ACTUAL.total_expenses_usd.toFixed(2)}</div>
         </div>
-        <div className="panel p-5">
+        <div className="panel p-5" style={{ borderColor: "var(--accent-border)" }}>
           <div className="label-dim">Operating Profit (ACTUAL)</div>
-          <div className="text-2xl font-bold neon-text">${report.ACTUAL.operating_profit_usd.toFixed(2)}</div>
+          <div className="text-2xl font-semibold" style={{ color: "var(--accent-strong)" }}>${report.ACTUAL.operating_profit_usd.toFixed(2)}</div>
         </div>
       </div>
 
