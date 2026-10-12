@@ -45,7 +45,11 @@ def get_product(product_id: int, db: Session = Depends(get_db), user=Depends(get
         ],
         "qa_results": [{"check_name": r.check_name, "passed": r.passed, "details": r.details} for r in qa],
         "listing": (
-            {"id": listing.id, "status": listing.status, "title": listing.title, "is_simulated": listing.is_simulated}
+            {
+                "id": listing.id, "status": listing.status, "title": listing.title,
+                "description": listing.description, "price_usd": listing.price_usd, "tags": listing.tags,
+                "is_simulated": listing.is_simulated,
+            }
             if listing else None
         ),
     }
