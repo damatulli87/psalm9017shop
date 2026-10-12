@@ -1,0 +1,335 @@
+@import "tailwindcss";
+
+/*
+ * Modern dark SaaS palette (zinc/slate neutrals, not pure black), a single
+ * restrained accent color, and soft elevation instead of neon glow. Class
+ * names (panel, chip, btn-neon, neon-text, status-dot, feed-line, conduit)
+ * are kept stable from the earlier terminal-themed version so page files
+ * didn't need touching -- only what these classes render changed.
+ */
+:root {
+  --bg: #0a0a0d;
+  --surface: #131317;
+  --surface-raised: #1a1b20;
+  --surface-hover: #202126;
+  --border: #26272e;
+  --border-soft: #1c1d23;
+
+  --text: #f4f4f6;
+  --text-dim: #9a9ba6;
+  --text-faint: #6b6c76;
+
+  --accent: #10b981;
+  --accent-strong: #34d399;
+  --accent-soft: rgba(16, 185, 129, 0.14);
+  --accent-border: rgba(16, 185, 129, 0.35);
+
+  --blue: #3b82f6;
+  --blue-strong: #60a5fa;
+  --blue-soft: rgba(59, 130, 246, 0.14);
+  --blue-border: rgba(59, 130, 246, 0.35);
+
+  --amber: #f59e0b;
+  --amber-strong: #fbbf24;
+  --amber-soft: rgba(245, 158, 11, 0.12);
+  --amber-border: rgba(245, 158, 11, 0.32);
+
+  --danger: #f87171;
+  --danger-soft: rgba(248, 113, 113, 0.12);
+  --danger-border: rgba(248, 113, 113, 0.32);
+
+  /* legacy aliases so existing component CSS below stays readable */
+  --neon: var(--accent-strong);
+  --neon-dim: var(--accent);
+  --neon-glow: var(--accent-soft);
+  --warning: var(--amber);
+  --bg-panel: var(--surface);
+  --bg-panel-raised: var(--surface-raised);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-sans), ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  letter-spacing: -0.01em;
+}
+
+code, pre, .font-mono-ui {
+  font-family: ui-monospace, "SF Mono", "Cascadia Code", "Roboto Mono", monospace;
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 6px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--text-faint);
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.panel {
+  background: linear-gradient(180deg, var(--surface) 0%, var(--surface) 100%);
+  border: 1px solid var(--border-soft);
+  border-radius: 16px;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 8px 24px -12px rgba(0, 0, 0, 0.5);
+}
+
+.panel-raised {
+  background: var(--surface-raised);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+}
+
+.neon-text {
+  color: var(--accent-strong);
+  font-weight: 600;
+}
+
+.neon-border {
+  border-color: var(--border);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 8px 24px -12px rgba(0, 0, 0, 0.6);
+}
+
+.status-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+.status-dot.idle {
+  background: var(--text-faint);
+}
+.status-dot.working {
+  background: var(--accent-strong);
+  animation: pulse 1.6s ease-in-out infinite;
+}
+.status-dot.error {
+  background: var(--danger);
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+
+.btn-neon {
+  background: var(--accent);
+  border: 1px solid var(--accent);
+  color: #06160f;
+  padding: 0.55rem 1.1rem;
+  border-radius: 10px;
+  transition: all 0.15s ease;
+  font-weight: 600;
+  font-size: 0.875rem;
+}
+.btn-neon:hover {
+  background: var(--accent-strong);
+  border-color: var(--accent-strong);
+}
+.btn-neon:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.btn-danger {
+  background: transparent;
+  border: 1px solid var(--danger-border);
+  color: var(--danger);
+  padding: 0.55rem 1.1rem;
+  border-radius: 10px;
+  font-weight: 600;
+  font-size: 0.875rem;
+  transition: all 0.15s ease;
+}
+.btn-danger:hover {
+  background: var(--danger-soft);
+}
+
+.label-dim {
+  color: var(--text-dim);
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  font-weight: 600;
+}
+
+.grid-bg {
+  background: radial-gradient(ellipse 80% 50% at 50% -20%, rgba(16, 185, 129, 0.06), transparent);
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.3rem 0.65rem;
+  border-radius: 999px;
+  border: 1px solid transparent;
+  background: var(--surface-raised);
+  color: var(--text-dim);
+  font-size: 0.72rem;
+  font-weight: 500;
+}
+.chip.chip-neon { background: var(--accent-soft); color: var(--accent-strong); }
+.chip.chip-amber { background: var(--amber-soft); color: var(--amber-strong); }
+.chip.chip-blue { background: var(--blue-soft); color: var(--blue-strong); }
+.chip.chip-dim { background: var(--surface-raised); color: var(--text-dim); }
+.chip.chip-danger { background: var(--danger-soft); color: var(--danger); }
+
+.feed-line {
+  border-left: 2px solid var(--border);
+  padding-left: 0.65rem;
+  position: relative;
+}
+.feed-line::before {
+  content: "";
+  position: absolute;
+  left: -5px;
+  top: 0.35rem;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--text-faint);
+}
+.feed-line.feed-success::before { background: var(--accent-strong); }
+.feed-line.feed-warn::before { background: var(--amber); }
+.feed-line.feed-error::before { background: var(--danger); }
+
+@keyframes flow {
+  to { stroke-dashoffset: -24; }
+}
+.conduit {
+  stroke-dasharray: 4 6;
+  animation: flow 1s linear infinite;
+}
+.conduit.conduit-idle {
+  animation: none;
+  opacity: 0.35;
+}
+
+/* ---------------- Factory Floor: premium illustrated variant ---------------- */
+
+.room-floor-bg {
+  background: transparent;
+}
+
+.room-card {
+  background: var(--surface-raised);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.25), 0 12px 28px -16px rgba(0, 0, 0, 0.55);
+  transition: border-color 0.35s ease, box-shadow 0.35s ease, transform 0.2s ease;
+}
+.room-card.room-active {
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.25), 0 16px 32px -14px rgba(16, 185, 129, 0.25);
+}
+.room-card.room-planned {
+  background: repeating-linear-gradient(
+    135deg,
+    var(--surface) 0px,
+    var(--surface) 10px,
+    var(--surface-raised) 10px,
+    var(--surface-raised) 20px
+  );
+}
+
+.icon-badge {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 11px;
+  font-size: 16px;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08), 0 2px 6px rgba(0, 0, 0, 0.35);
+}
+
+.hallway-line {
+  background: var(--border);
+  transition: background 0.4s ease;
+}
+.hallway-line.hallway-active {
+  background: var(--accent-border);
+}
+
+@keyframes wander {
+  0% { transform: translate(-50%, -50%) translate(0, 0); }
+  25% { transform: translate(-50%, -50%) translate(var(--p1x), var(--p1y)); }
+  50% { transform: translate(-50%, -50%) translate(var(--p2x), var(--p2y)); }
+  75% { transform: translate(-50%, -50%) translate(var(--p3x), var(--p3y)); }
+  100% { transform: translate(-50%, -50%) translate(0, 0); }
+}
+.worker-token {
+  position: absolute;
+  width: 26px;
+  height: 26px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  line-height: 1;
+  border-radius: 50%;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.45);
+  animation: wander var(--dur, 8s) ease-in-out infinite;
+  animation-delay: var(--delay, 0s);
+  user-select: none;
+  will-change: transform;
+}
+
+@keyframes walk-h {
+  0% { left: -4%; opacity: 0; }
+  12% { opacity: 1; }
+  88% { opacity: 1; }
+  100% { left: 104%; opacity: 0; }
+}
+@keyframes walk-v {
+  0% { top: -4%; opacity: 0; }
+  12% { opacity: 1; }
+  88% { opacity: 1; }
+  100% { top: 104%; opacity: 0; }
+}
+@keyframes walk-h-rev {
+  0% { left: 104%; opacity: 0; }
+  12% { opacity: 1; }
+  88% { opacity: 1; }
+  100% { left: -4%; opacity: 0; }
+}
+@keyframes walk-v-rev {
+  0% { top: 104%; opacity: 0; }
+  12% { opacity: 1; }
+  88% { opacity: 1; }
+  100% { top: -4%; opacity: 0; }
+}
+.hall-walker {
+  position: absolute;
+  width: 18px;
+  height: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  border-radius: 50%;
+  background: var(--surface);
+  border: 1px solid var(--accent-border);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4);
+  animation-duration: 2.6s;
+  animation-timing-function: ease-in-out;
+  animation-iteration-count: infinite;
+}
+.hall-walker.horiz { top: 50%; transform: translateY(-50%); animation-name: walk-h; }
+.hall-walker.vert { left: 50%; transform: translateX(-50%); animation-name: walk-v; }
+.hall-walker.horiz.reversed { animation-name: walk-h-rev; }
+.hall-walker.vert.reversed { animation-name: walk-v-rev; }

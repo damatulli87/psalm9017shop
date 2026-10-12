@@ -1,0 +1,15 @@
+backend/venv/
+backend/.env
+backend/ultron.db
+backend/storage/
+backend/__pycache__/
+backend/**/__pycache__/
+backend/.pytest_cache/
+frontend/node_modules/
+frontend/.next/
+frontend/.env.local
+*.pyc
+.DS_Store
+design-ref/
+backend/server.log
+frontend/frontend.log
