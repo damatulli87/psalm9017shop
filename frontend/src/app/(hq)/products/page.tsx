@@ -25,7 +25,12 @@ export default function ProductsPage() {
   const [selected, setSelected] = useState<ProductDetail | null>(null);
 
   useEffect(() => {
-    apiFetch<Product[]>("/products").then(setProducts).catch(() => {});
+    function refresh() {
+      apiFetch<Product[]>("/products").then(setProducts).catch(() => {});
+    }
+    refresh();
+    const interval = setInterval(refresh, 6000);
+    return () => clearInterval(interval);
   }, []);
 
   async function openProduct(id: number) {

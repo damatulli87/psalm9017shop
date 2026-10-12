@@ -25,6 +25,8 @@ export default function ApprovalsPage() {
 
   useEffect(() => {
     refresh();
+    const interval = setInterval(refresh, 5000);
+    return () => clearInterval(interval);
   }, []);
 
   async function decide(id: number, approve: boolean) {

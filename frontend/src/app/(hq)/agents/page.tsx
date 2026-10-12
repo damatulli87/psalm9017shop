@@ -20,7 +20,12 @@ export default function AgentsPage() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    apiFetch<Agent[]>("/agents").then(setAgents).catch((e) => setError(String(e)));
+    function refresh() {
+      apiFetch<Agent[]>("/agents").then(setAgents).catch((e) => setError(String(e)));
+    }
+    refresh();
+    const interval = setInterval(refresh, 6000);
+    return () => clearInterval(interval);
   }, []);
 
   if (error) return <p className="text-[var(--danger)]">{error}</p>;

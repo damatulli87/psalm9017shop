@@ -22,7 +22,12 @@ export default function FinancialsPage() {
   const [report, setReport] = useState<Report | null>(null);
 
   useEffect(() => {
-    apiFetch<Report>("/financials/report").then(setReport).catch(() => {});
+    function refresh() {
+      apiFetch<Report>("/financials/report").then(setReport).catch(() => {});
+    }
+    refresh();
+    const interval = setInterval(refresh, 8000);
+    return () => clearInterval(interval);
   }, []);
 
   if (!report) return <p className="label-dim">Loading financial ledger...</p>;

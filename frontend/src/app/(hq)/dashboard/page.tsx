@@ -44,8 +44,13 @@ export default function DashboardPage() {
   const [ultron, setUltron] = useState<SystemReview>(null);
 
   useEffect(() => {
-    apiFetch<Summary>("/dashboard/summary").then(setData).catch((e) => setError(String(e)));
-    apiFetch<SystemReview>("/oversight/reviews/latest-system").then(setUltron).catch(() => {});
+    function refresh() {
+      apiFetch<Summary>("/dashboard/summary").then(setData).catch((e) => setError(String(e)));
+      apiFetch<SystemReview>("/oversight/reviews/latest-system").then(setUltron).catch(() => {});
+    }
+    refresh();
+    const interval = setInterval(refresh, 6000);
+    return () => clearInterval(interval);
   }, []);
 
   if (error) return <p className="text-[var(--danger)]">{error}</p>;

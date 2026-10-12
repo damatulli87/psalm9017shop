@@ -32,6 +32,8 @@ export default function MarketplacePage() {
 
   useEffect(() => {
     refresh();
+    const interval = setInterval(refresh, 6000);
+    return () => clearInterval(interval);
   }, []);
 
   async function disconnectEtsy() {
