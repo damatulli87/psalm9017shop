@@ -24,7 +24,7 @@ async def lifespan(app: FastAPI):
     stop_scheduler()
 
 
-app = FastAPI(title="ULTRON Commerce API", version="0.1.0", lifespan=lifespan)
+app = FastAPI(title="Psalm 90:17 Commerce API", version="0.1.0", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,

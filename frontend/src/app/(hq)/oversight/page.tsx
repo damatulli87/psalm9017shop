@@ -70,9 +70,9 @@ export default function OversightPage() {
     <div className="space-y-6">
       <div className="flex items-start justify-between">
         <div>
-          <h1 className="text-2xl font-bold neon-text">ULTRON Oversight</h1>
+          <h1 className="text-2xl font-bold neon-text">Psalm 90:17 Oversight</h1>
           <p className="label-dim mt-1 max-w-2xl">
-            ULTRON independently re-derives conclusions from raw data and compares them against what each agent
+            Psalm 90:17 independently re-derives conclusions from raw data and compares them against what each agent
             reported -- it does not trust self-reported status. A blocked verdict opens a real entry in the
             Approval Center; it cannot resolve its own concerns.
           </p>

@@ -50,7 +50,7 @@ def generate_preview_png(path: Path, *, title: str, palette: dict) -> None:
         draw.text(((PREVIEW_SIZE[0] - w) / 2, y), line, fill=fg, font=font)
         y += 110
 
-    footer = "ULTRON Commerce"
+    footer = "Psalm 90:17 Commerce"
     bbox = draw.textbbox((0, 0), footer, font=font_small)
     w = bbox[2] - bbox[0]
     draw.text(((PREVIEW_SIZE[0] - w) / 2, PREVIEW_SIZE[1] - 150), footer, fill=fg, font=font_small)

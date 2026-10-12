@@ -1,5 +1,5 @@
 """
-ULTRON Commerce database schema (spec section 27).
+Psalm 90:17 Commerce database schema (spec section 27).
 
 Design notes:
 - SQLite by default for zero-install local dev; set DATABASE_URL to a
@@ -193,6 +193,11 @@ class ProductSpecification(Base):
     title: Mapped[str] = mapped_column(String(255))
     product_type: Mapped[str] = mapped_column(String(20))  # digital/pod
     target_customer: Mapped[str] = mapped_column(Text)
+    # True only when target_customer actually came from a real AI provider call
+    # (not the MOCK_LLM fallback). Drives whether listing copy may honestly
+    # claim AI assistance -- see SEOAgent.build_listing_copy and
+    # UltronSupervisorAgent.verify_ai_disclosure_accuracy.
+    target_customer_is_ai: Mapped[bool] = mapped_column(Boolean, default=False)
     problem_solved: Mapped[str] = mapped_column(Text)
     format: Mapped[str] = mapped_column(String(50))  # pdf/xlsx/docx/zip/tshirt/mug/...
     design_brief: Mapped[dict] = mapped_column(JSON, default=dict)
@@ -455,7 +460,7 @@ class OAuthToken(Base):
 
 class SupervisionReview(Base):
     """
-    ULTRON's independent verification record (spec section 4: 'monitoring
+    Psalm 90:17's independent verification record (spec section 4: 'monitoring
     execution', 'identifying operational problems'). Each row is the result
     of re-deriving a conclusion from raw data and comparing it against what
     the responsible agent reported -- not an LLM opinion. `findings` holds

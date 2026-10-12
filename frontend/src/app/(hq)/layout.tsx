@@ -7,7 +7,7 @@ import { clearToken, getToken } from "@/lib/api";
 
 const NAV = [
   { href: "/dashboard", label: "Dashboard", glyph: "\u{1F4CA}" },
-  { href: "/oversight", label: "ULTRON Oversight", glyph: "\u{1F6E1}️" },
+  { href: "/oversight", label: "Psalm 90:17 Oversight", glyph: "\u{1F6E1}️" },
   { href: "/agents", label: "Agent Network", glyph: "\u{1F9E9}" },
   { href: "/missions", label: "Mission Control", glyph: "\u{1F680}" },
   { href: "/products", label: "Product Factory", glyph: "\u{1F4E6}" },
@@ -42,10 +42,10 @@ export default function HQLayout({ children }: { children: React.ReactNode }) {
             className="w-9 h-9 rounded-xl flex items-center justify-center font-bold text-sm shrink-0"
             style={{ background: "linear-gradient(135deg, var(--accent) 0%, var(--blue) 100%)", color: "#06160f" }}
           >
-            U
+            P
           </div>
           <div>
-            <div className="text-base font-bold tracking-tight">ULTRON</div>
+            <div className="text-base font-bold tracking-tight">Psalm 90:17</div>
             <div className="label-dim">Commerce OS</div>
           </div>
         </div>

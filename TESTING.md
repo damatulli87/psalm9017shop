@@ -33,14 +33,14 @@ and a valid ZIP; all 5 QA checks passed; listing #1 and approval #1 created.
 Verified again through the live HTTP API (login → dashboard → approve →
 publication stage completed → listing status `published_simulated`).
 
-`backend/tests/test_ultron_oversight.py` -- verifies ULTRON's oversight
+`backend/tests/test_ultron_oversight.py` -- verifies Psalm 90:17's oversight
 layer is a real independent check, not a rubber stamp:
 - `test_ultron_reviews_every_run_and_does_not_false_positive` -- runs the
   real pipeline, confirms a `SupervisionReview` is created on every exit
   path, and that a clean run never gets blocked.
 - `test_ultron_catches_a_real_inconsistency` -- runs the real pipeline,
   then deliberately deletes one of the product's registered files on disk
-  (without touching the DB row) and confirms ULTRON's post-hoc review
+  (without touching the DB row) and confirms Psalm 90:17's post-hoc review
   catches the mismatch, returns `verdict="blocked"`, and opens a real
   `operational_concern` Approval -- then restores the file.
 - `test_system_health_check_runs_clean` -- runs the system-wide health

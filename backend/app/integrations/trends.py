@@ -2,7 +2,7 @@
 Real external research signal: Google Trends via pytrends (no API key
 required -- it calls the same public endpoints the Trends website uses).
 
-This is the one "real data" source ULTRON Commerce has out of the box
+This is the one "real data" source Psalm 90:17 Commerce has out of the box
 without any owner-supplied credentials. Etsy's own marketplace-search data
 requires an authenticated, approved Etsy API app and is intentionally left
 BLOCKED/awaiting-configuration (see app/integrations/etsy.py) rather than

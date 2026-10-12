@@ -62,7 +62,7 @@ export default function DashboardPage() {
 
       <Link href="/oversight" className="panel p-5 flex items-center justify-between block hover:border-[var(--accent-border)] transition-colors">
         <div>
-          <div className="label-dim">ULTRON Oversight Verdict</div>
+          <div className="label-dim">Psalm 90:17 Oversight Verdict</div>
           <div className="text-sm text-[var(--text-dim)] mt-1">{ultron ? ultron.summary : "No health check has run yet."}</div>
         </div>
         {ultron && <span className={`chip ${VERDICT_STYLE[ultron.verdict]} shrink-0`}>{ultron.verdict.toUpperCase()}</span>}

@@ -13,10 +13,10 @@ from app.models.models import Agent, IntegrationCredential, OperatingPolicy, Sch
 AGENT_ROSTER = [
     {
         "key": "ultron",
-        "name": "ULTRON (Chief Executive AI)",
+        "name": "Psalm 90:17 (Chief Executive AI)",
         "responsibility": "Coordinates all agents, tracks company state, enforces policy, produces executive reports.",
         "system_prompt": (
-            "You are ULTRON, the chief executive AI of ULTRON Commerce. You coordinate specialist agents, "
+            "You are Psalm 90:17, the chief executive AI of Psalm 90:17 Commerce. You coordinate specialist agents, "
             "track operating state (products, listings, spend, revenue, failures), and decide what work to "
             "delegate next. You NEVER bypass the policy engine: any action flagged as requiring approval must "
             "be queued, not executed. You report honestly -- never represent projected numbers as actual, and "
@@ -115,7 +115,7 @@ AGENT_ROSTER = [
         "responsibility": "Manages Shopify products/orders once the owner activates Shopify expansion.",
         "system_prompt": (
             "You manage Shopify catalog and orders using the supported Admin API. You never activate a "
-            "Shopify storefront yourself; you only act once the owner has connected credentials and ULTRON "
+            "Shopify storefront yourself; you only act once the owner has connected credentials and Psalm 90:17 "
             "has recommended expansion based on evidence."
         ),
         "tools": ["shopify_adapter"],
@@ -228,7 +228,7 @@ def bootstrap(db: Session) -> None:
         ("daily_market_research", "Run market research scan", "0 7 * * *"),
         ("daily_order_monitor", "Poll connected storefronts for new orders", "*/30 * * * *"),
         ("daily_integration_health", "Check integration connection health", "0 6 * * *"),
-        ("daily_ultron_oversight", "ULTRON system-wide health check (agents, budget, stuck runs, stale approvals)", "30 7 * * *"),
+        ("daily_ultron_oversight", "Psalm 90:17 system-wide health check (agents, budget, stuck runs, stale approvals)", "30 7 * * *"),
         ("weekly_opportunity_selection", "Select new opportunities + produce products", "0 8 * * 1"),
         ("weekly_executive_report", "Generate executive performance report", "0 9 * * 1"),
         ("monthly_financial_reconciliation", "Reconcile financial results", "0 10 1 * *"),

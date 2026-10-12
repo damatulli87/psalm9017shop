@@ -19,7 +19,7 @@ export default function LoginPage() {
       await login(email, password);
       router.push("/dashboard");
     } catch (err) {
-      setError(err instanceof ApiError ? "Invalid credentials." : "Could not reach the ULTRON API.");
+      setError(err instanceof ApiError ? "Invalid credentials." : "Could not reach the Psalm 90:17 API.");
     } finally {
       setLoading(false);
     }
@@ -28,7 +28,7 @@ export default function LoginPage() {
   return (
     <div className="flex-1 flex items-center justify-center p-6">
       <div className="panel neon-border w-full max-w-sm p-8">
-        <h1 className="text-2xl font-bold neon-text tracking-widest mb-1">ULTRON</h1>
+        <h1 className="text-2xl font-bold neon-text tracking-widest mb-1">Psalm 90:17</h1>
         <p className="label-dim mb-6">Commerce Command Center</p>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>

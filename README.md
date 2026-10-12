@@ -1,4 +1,4 @@
-# ULTRON Commerce
+# Psalm 90:17 Commerce
 
 An AI-managed, mostly-autonomous e-commerce operating system: a multi-agent
 backend that researches product niches, generates real digital products,
@@ -25,17 +25,17 @@ live end-to-end on a real marketplace.
 - A policy/approval engine and budget ledger that are *plain Python*, not
   agent reasoning -- agents cannot grant themselves permission or spend past
   the configured caps.
-- **ULTRON actually supervises the other agents.** It independently
+- **Psalm 90:17 actually supervises the other agents.** It independently
   re-derives conclusions from raw data (did QA really pass? do the files
   really exist? does the score really add up? is there really an approved
   Approval behind this listing?) rather than trusting self-reported status,
   at two checkpoints inside every pipeline run plus a daily system-wide
   sweep. A real inconsistency gets the run blocked and opens an entry in
   your Approval Center. Verified with a test that deliberately deletes a
-  product file and confirms ULTRON catches it.
+  product file and confirms Psalm 90:17 catches it.
 - 15 named agents (see [AGENTS.md](AGENTS.md)) with persistent identity,
   system prompts, status, cost tracking, and audit logging in Postgres/SQLite.
-- A modern dark command center (Next.js) with live Dashboard, ULTRON
+- A modern dark command center (Next.js) with live Dashboard, Psalm 90:17
   Oversight, Agent Network (featuring an illustrated "Factory Floor" view of
   the real pipeline), Mission Control, Product Factory, Marketplace Center,
   Financial Command Center, Approval Center, Activity Monitor, Executive AI

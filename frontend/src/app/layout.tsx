@@ -9,7 +9,7 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-  title: "ULTRON Commerce | Command Center",
+  title: "Psalm 90:17 Commerce | Command Center",
   description: "Autonomous AI e-commerce operations center.",
 };
 

@@ -1,14 +1,14 @@
 """
-ULTRON -- Chief Executive AI (spec section 4): "monitoring execution",
+Psalm 90:17 -- Chief Executive AI (spec section 4): "monitoring execution",
 "identifying operational problems", "evaluating new opportunities".
 
 This is a real, independent verifier, not a report generator that trusts
 other agents' self-reported status. Every check here re-derives a
 conclusion from the raw rows (QAResult, Task, Expense, Agent.status, files
 on disk) and compares it against what the responsible agent/stage claimed.
-Like the policy engine, there is no LLM call in this file -- ULTRON's job
-is to catch real inconsistencies with measurable signals, not to form an
-opinion. A "blocked" verdict always comes with the specific check that
+Like the policy engine, there is no LLM call in this file -- Psalm 90:17's
+job is to catch real inconsistencies with measurable signals, not to form
+an opinion. A "blocked" verdict always comes with the specific check that
 failed and the data that proves it.
 
 Two kinds of review:
@@ -21,7 +21,7 @@ Two kinds of review:
 
 A "blocked" verdict opens a real Approval row (action_type=
 "operational_concern") so it surfaces in the owner's Approval Center --
-ULTRON cannot resolve its own concerns; it can only raise them.
+Psalm 90:17 cannot resolve its own concerns; it can only raise them.
 """
 from __future__ import annotations
 
@@ -175,6 +175,46 @@ class UltronSupervisorAgent(BaseAgent):
                 findings.append(_finding("publish_authorization", PASS, f"Listing #{listing.id} publish path has a valid, owner-approved Approval record."))
         return findings
 
+    def verify_ai_disclosure_accuracy(self, product: ProductSpecification) -> list[dict]:
+        """
+        Etsy's Creativity Standards require disclosing AI involvement when
+        it actually happened -- and the Seller Policy separately requires
+        listings to be honest, which cuts the other way too: claiming AI
+        was used when it wasn't is its own inaccurate-representation
+        problem. This independently re-checks the actual listing text
+        against product.target_customer_is_ai rather than trusting that
+        SEOAgent got the conditional right.
+        """
+        from app.agents.seo import AI_DISCLOSURE_MARKER
+
+        findings = []
+        listing = self.db.query(MarketplaceListing).filter(MarketplaceListing.product_id == product.id).first()
+        if not listing:
+            return findings
+
+        disclosed = AI_DISCLOSURE_MARKER in listing.description
+        actually_ai = product.target_customer_is_ai
+
+        if actually_ai and not disclosed:
+            findings.append(_finding(
+                "ai_disclosure_accuracy", FAIL,
+                f"Product #{product.id} used a real AI provider for listing content, but listing "
+                f"#{listing.id}'s description contains no AI disclosure -- required by Etsy's Creativity Standards.",
+            ))
+        elif disclosed and not actually_ai:
+            findings.append(_finding(
+                "ai_disclosure_accuracy", FAIL,
+                f"Listing #{listing.id} claims AI assistance but product #{product.id} was produced without a "
+                "real AI provider call (MOCK_LLM fallback) -- this is a false disclosure, not a missing one.",
+            ))
+        else:
+            findings.append(_finding(
+                "ai_disclosure_accuracy", PASS,
+                f"Listing #{listing.id}'s AI disclosure ({'present' if disclosed else 'absent'}) matches actual "
+                f"AI involvement ({actually_ai}).",
+            ))
+        return findings
+
     def verify_tasks(self, run: WorkflowRun) -> list[dict]:
         findings = []
         tasks = self.db.query(Task).filter(Task.workflow_run_id == run.id).all()
@@ -235,6 +275,7 @@ class UltronSupervisorAgent(BaseAgent):
             if product:
                 findings += self.verify_qa(product)
                 findings += self.verify_publish_authorization(product)
+                findings += self.verify_ai_disclosure_accuracy(product)
 
         verdict = _verdict_from(findings)
         fail_count = sum(1 for f in findings if f["status"] == FAIL)
@@ -257,7 +298,7 @@ class UltronSupervisorAgent(BaseAgent):
 
         if verdict == "blocked":
             self._raise_concern(
-                summary=f"ULTRON oversight BLOCKED on workflow run #{run.id}: {summary}",
+                summary=f"Psalm 90:17 oversight BLOCKED on workflow run #{run.id}: {summary}",
                 payload={"review_id": review.id, "workflow_run_id": run.id, "findings": findings},
             )
 
@@ -313,7 +354,7 @@ class UltronSupervisorAgent(BaseAgent):
 
         if verdict == "blocked":
             self._raise_concern(
-                summary=f"ULTRON system health check BLOCKED: {summary}",
+                summary=f"Psalm 90:17 system health check BLOCKED: {summary}",
                 payload={"review_id": review.id, "findings": findings},
             )
 

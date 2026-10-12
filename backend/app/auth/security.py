@@ -1,5 +1,5 @@
 """
-Owner authentication. ULTRON Commerce is a single-owner system for now
+Owner authentication. Psalm 90:17 Commerce is a single-owner system for now
 (spec section 29: owner authentication, role-based permissions). The owner
 account is seeded from Settings on first boot; see app/bootstrap.py.
 """

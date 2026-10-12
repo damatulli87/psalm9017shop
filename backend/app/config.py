@@ -1,5 +1,5 @@
 """
-Central configuration for ULTRON Commerce.
+Central configuration for Psalm 90:17 Commerce.
 
 All business-critical limits (budgets, autonomy mode, approval thresholds) live
 here and in the `operating_policies` DB table -- NOT inside agent prompts or
@@ -21,7 +21,7 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 
     # --- Identity / auth ---
-    app_name: str = "ULTRON Commerce"
+    app_name: str = "Psalm 90:17 Commerce"
     secret_key: str = "CHANGE_ME_INSECURE_DEV_SECRET_DO_NOT_USE_IN_PRODUCTION"
     access_token_expire_minutes: int = 60 * 12
     owner_email: str = "owner@example.com"

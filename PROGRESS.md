@@ -23,7 +23,7 @@ Last updated: 2026-10-12, end of first build session.
 | 15 | Fulfillment workflows operate within policy | ❌ | Not built (no POD integration) |
 | 16 | Actual financial data is recorded | ✅ | `Expense`/`Transaction` ledger real; correctly shows $0.00 ACTUAL since no real sales exist |
 | 17 | Profitability calculated correctly | ✅ | Verified via `/financials/report`; ACTUAL/PROJECTED/UNKNOWN kept separate |
-| 18 | Agents can analyze performance | ⚠️ Partial | Financial Controller: yes. ULTRON: yes, independently re-verifies other agents' work against raw data (see §4 below). Growth Strategy Agent: not built (nothing to analyze yet) |
+| 18 | Agents can analyze performance | ⚠️ Partial | Financial Controller: yes. Psalm 90:17: yes, independently re-verifies other agents' work against raw data (see §4 below). Growth Strategy Agent: not built (nothing to analyze yet) |
 | 19 | Strategy adjustments recorded and reversible | ⚠️ Partial | `OperatingPolicy` rows are versioned and editable via API; no agent yet proposes adjustments autonomously (self-improvement engine not built) |
 | 20 | Scheduled workflows run without manual initiation | ✅ | 6 APScheduler jobs registered from DB `ScheduledJob` rows at startup; verified registration, not yet observed firing on its own cron schedule during this session (would require running past the next trigger time) |
 | 21 | Sensitive actions require approval | ✅ | Verified: `publish_listing` always queued an `Approval` in SUPERVISED mode |
@@ -40,7 +40,7 @@ finished, 26/26 production business.
 ## Feature checklist by spec section
 
 - [x] §3 Multi-agent architecture (15 agents, identity/prompt/tools/status/cost/logs/retries) — DB-driven, not LangGraph (see ARCHITECTURE.md for why)
-- [x] §4 ULTRON coordination — via workflow engine + chat router, plus a real independent oversight layer (`app/agents/ultron.py`): re-verifies other agents' work against raw data at 2 in-pipeline checkpoints + a post-hoc review on every run + a daily system-wide health check; blocked verdicts open a real Approval. Not yet a standalone open-ended autonomous reasoning loop.
+- [x] §4 Psalm 90:17 coordination — via workflow engine + chat router, plus a real independent oversight layer (`app/agents/ultron.py`): re-verifies other agents' work against raw data at 2 in-pipeline checkpoints + a post-hoc review on every run + a daily system-wide health check; blocked verdicts open a real Approval. Not yet a standalone open-ended autonomous reasoning loop.
 - [x] §5 Market Intelligence Agent — real Trends signal; Etsy competitive data explicitly blocked, not guessed
 - [x] §6 Opportunity Decision Engine — configurable weights, can reject all
 - [x] §7 Product Strategy Agent
@@ -61,7 +61,7 @@ finished, 26/26 production business.
 - [x] §22 Autonomy/Approval Engine — SUPERVISED default, independent policy engine
 - [x] §23 Budget Management — hard-enforced caps
 - [x] §24 Agent Memory — `AgentMemory` table + audit logs exist; no semantic retrieval yet
-- [~] §25 Full Command Center — 11 screens built (added ULTRON Oversight); interactive React-Flow-style graph not built (a custom illustrated "Factory Floor" pipeline view instead); WebSocket live push not built (polling instead)
+- [~] §25 Full Command Center — 11 screens built (added Psalm 90:17 Oversight); interactive React-Flow-style graph not built (a custom illustrated "Factory Floor" pipeline view instead); WebSocket live push not built (polling instead)
 - [x] §26 Tech stack — FastAPI/SQLAlchemy/Next.js/Tailwind as specified; LangGraph swapped for a custom durable engine (documented); Redis/Docker not used yet
 - [x] §27 Database architecture — all 30 entities, migrated, constrained
 - [~] §28 Integration architecture — Trends + Etsy adapters real; Printify/Printful/Shopify/storage/email not built

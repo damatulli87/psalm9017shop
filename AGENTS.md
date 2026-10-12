@@ -41,7 +41,7 @@ real customer messages" with no real customers would violate the project's
 own "do not fabricate activity" rule. See [PROGRESS.md](PROGRESS.md) for the
 dependency each one is blocked on.
 
-## ULTRON as an independent verifier, not a report generator
+## Psalm 90:17 as an independent verifier, not a report generator
 
 Spec section 4 asks for a "boss" that monitors execution and identifies
 operational problems. `app/agents/ultron.py` implements this as real,
@@ -61,7 +61,7 @@ Checks it runs:
 - **`assets_present_on_disk`** -- re-opens every registered file path on
   disk; a product can't claim to have deliverables that don't exist.
 - **`publish_authorization`** -- any listing in a gated state must have a
-  real, owner-approved `Approval` row referencing it, or ULTRON treats that
+  real, owner-approved `Approval` row referencing it, or Psalm 90:17 treats that
   as a policy-engine bypass.
 - **`no_failed_tasks` / `workflow_cost_cap` / `agent_health`** -- per-run
   sanity checks against `Task`, `Expense`, and `Agent.status`.
@@ -73,11 +73,11 @@ Two checkpoints run *inside* the pipeline itself (after opportunity
 selection, after QA) and can halt the run with status
 `blocked_by_oversight` before any further stage executes; a final review
 runs on every exit path. A `blocked` verdict opens a real `Approval` row
-(`action_type="operational_concern"`) -- ULTRON raises concerns, it does
+(`action_type="operational_concern"`) -- Psalm 90:17 raises concerns, it does
 not resolve them itself. Verified in `backend/tests/test_ultron_oversight.py`:
 one test confirms it doesn't false-positive on a clean run, another
-deliberately deletes a registered file and confirms ULTRON catches it and
-escalates. Visible in the command center's **ULTRON Oversight** screen.
+deliberately deletes a registered file and confirms Psalm 90:17 catches it and
+escalates. Visible in the command center's **Psalm 90:17 Oversight** screen.
 
 ## Model routing
 

@@ -54,6 +54,7 @@ class ProductStrategyAgent(BaseAgent):
             title=f"{opportunity.niche_title} - Starter Edition",
             product_type=opportunity.category,
             target_customer=ai_resp.text,
+            target_customer_is_ai=not ai_resp.is_mock,
             problem_solved=f"Helps the target customer address needs within the '{opportunity.niche_title}' niche.",
             format=fmt,
             design_brief={},

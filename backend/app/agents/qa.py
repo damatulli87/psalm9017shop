@@ -118,12 +118,11 @@ class QAAgent(BaseAgent):
             self._record(product.id, "zip_package_valid", False, "Delivery ZIP missing.")
             all_passed = False
 
-        # --- Listing-accuracy disclosure check (marketplace compliance, section 11) ---
-        self._record(
-            product.id, "ai_disclosure_present", True,
-            "Listing template includes AI-assistance disclosure (see INSTRUCTIONS.txt). "
-            "NOTE: automated check confirms disclosure text is present only -- this is not legal clearance.",
-        )
+        # NOTE: AI-disclosure accuracy is NOT checked here -- QA runs before
+        # listing_creation, so there's no listing description yet to check
+        # against. That check runs post-hoc in UltronSupervisorAgent
+        # (verify_ai_disclosure_accuracy), where the actual listing text and
+        # the product's real AI-involvement flag both exist to compare.
 
         product.status = "qa_passed" if all_passed else "qa_failed"
         self.db.commit()

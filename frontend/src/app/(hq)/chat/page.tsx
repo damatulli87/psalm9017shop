@@ -9,7 +9,7 @@ export default function ChatPage() {
   const [turns, setTurns] = useState<ChatTurn[]>([
     {
       role: "ultron",
-      text: "ULTRON online. I can run the research pipeline, show pending approvals, or report on paid activity. Full open-ended command parsing is still limited -- see PROGRESS.md.",
+      text: "Psalm 90:17 online. I can run the research pipeline, show pending approvals, or report on paid activity. Full open-ended command parsing is still limited -- see PROGRESS.md.",
     },
   ]);
   const [input, setInput] = useState("");

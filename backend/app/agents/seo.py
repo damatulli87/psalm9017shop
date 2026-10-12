@@ -1,10 +1,35 @@
-"""SEO Agent (spec section 14): titles, descriptions, tags from real product data (no stuffing/fake urgency)."""
+"""
+SEO Agent (spec section 14): titles, descriptions, tags from real product
+data (no stuffing/fake urgency).
+
+AI disclosure (Etsy Creativity Standards: "Sellers must disclose within
+their listing description if an item is created with the use of AI"): the
+disclosure sentence is only ever added when `product.target_customer_is_ai`
+is actually True -- i.e. a real AI provider (not the MOCK_LLM fallback)
+actually generated content incorporated into this listing. Claiming AI
+involvement that didn't happen is exactly the kind of inaccurate
+representation the Seller Policy separately prohibits, so this must never
+be a static boilerplate line. `AI_DISCLOSURE_MARKER` is checked verbatim by
+`UltronSupervisorAgent.verify_ai_disclosure_accuracy` to independently
+confirm the disclosure is present if and only if it should be.
+"""
 from __future__ import annotations
 
 from app.agents.base import BaseAgent
 from app.models.models import MarketOpportunity, ProductSpecification
 
 BANNED_PHRASES = ["limited time", "only today", "act now", "guaranteed results"]
+AI_DISCLOSURE_MARKER = "assistance of AI tools"
+
+
+def _clean_ai_narrative(raw: str) -> str | None:
+    """target_customer holds the raw AI response text. Keep listing copy to a
+    short, clean paragraph -- truncate rather than dump a long raw completion
+    into the description."""
+    text = raw.strip()
+    if not text:
+        return None
+    return text[:400].rsplit(". ", 1)[0] + "." if len(text) > 400 else text
 
 
 class SEOAgent(BaseAgent):
@@ -16,14 +41,24 @@ class SEOAgent(BaseAgent):
             if product.product_type == "digital" else f"{product.title} | {niche}"
         title = title[:140]
 
-        description = (
-            f"{product.title}\n\n"
-            f"{product.problem_solved}\n\n"
+        parts = [
+            product.title,
+            "",
+            product.problem_solved,
+            "",
             f"Format: {product.format.upper()}. "
-            f"{'Instant digital download -- no physical item is shipped.' if product.product_type == 'digital' else 'Printed and shipped by our production partner.'}\n\n"
-            "This listing was created with the assistance of AI-based design and writing tools, reviewed "
-            "before publication. Production partner and AI-assistance disclosures are included per marketplace policy."
-        )
+            + ("Instant digital download -- no physical item is shipped."
+               if product.product_type == "digital" else "Printed and shipped by our production partner."),
+        ]
+
+        if product.target_customer_is_ai:
+            narrative = _clean_ai_narrative(product.target_customer)
+            if narrative:
+                parts += ["", narrative]
+            parts += ["", f"Parts of this listing's description were generated with the {AI_DISCLOSURE_MARKER}, "
+                           "guided and reviewed by the seller before publication."]
+
+        description = "\n".join(parts)
 
         for phrase in BANNED_PHRASES:
             if phrase in description.lower():
@@ -33,5 +68,9 @@ class SEOAgent(BaseAgent):
         tags = list(dict.fromkeys(base_tags + [product.format, product.product_type, "ultron commerce"]))[:13]
 
         copy = {"title": title, "description": description, "tags": tags}
-        self.log("listing_copy_generated", f"SEO copy prepared for product #{product.id}", copy)
+        self.log(
+            "listing_copy_generated",
+            f"SEO copy prepared for product #{product.id} (ai_disclosed={product.target_customer_is_ai})",
+            copy,
+        )
         return copy

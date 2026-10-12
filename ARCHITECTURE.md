@@ -68,7 +68,7 @@ resume_after_approval()                  -> publication stage, then stubs
                                              rather than skipping silently
 ```
 
-## ULTRON is a verifier, not a coordinator-in-name-only
+## Psalm 90:17 is a verifier, not a coordinator-in-name-only
 
 `backend/app/agents/ultron.py` re-derives conclusions from raw rows (QA
 results, registered file paths, opportunity scores, approval records) and
@@ -78,7 +78,7 @@ than trusting a status column. Two checkpoints are embedded directly in
 run with `blocked_by_oversight`; a full review runs on every exit path
 (including both branches of `resume_after_approval`), and a system-wide
 sweep runs daily via the scheduler. A `blocked` verdict opens a real
-`Approval` row -- ULTRON can raise a concern but, like every other agent,
+`Approval` row -- Psalm 90:17 can raise a concern but, like every other agent,
 cannot resolve it itself; only the owner can. See AGENTS.md for the full
 check list and `backend/tests/test_ultron_oversight.py` for the test that
 proves it actually catches a deliberately-introduced inconsistency rather

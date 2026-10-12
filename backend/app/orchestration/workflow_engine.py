@@ -91,7 +91,7 @@ def _complete_task(db: Session, task: Task, output: dict, status: str = "complet
 
 def _final_review(db: Session, run: WorkflowRun) -> None:
     """
-    ULTRON's post-hoc sign-off on everything this run touched. Wrapped
+    Psalm 90:17's post-hoc sign-off on everything this run touched. Wrapped
     defensively: a bug in the oversight layer itself must never erase or
     mask a pipeline result that already completed and was persisted.
     """
@@ -103,7 +103,7 @@ def _final_review(db: Session, run: WorkflowRun) -> None:
 
         db.add(AuditEvent(
             event_type="supervision_review_error", actor="ultron",
-            summary=f"ULTRON's post-hoc review of run #{run.id} itself failed: {exc}",
+            summary=f"Psalm 90:17's post-hoc review of run #{run.id} itself failed: {exc}",
             payload={"workflow_run_id": run.id},
         ))
         db.commit()
@@ -149,7 +149,7 @@ def run_digital_product_pipeline(db: Session, mission_id: int | None = None, nic
         return run
     _complete_task(db, t, {"selected_opportunity_id": selected.id})
 
-    # --- ULTRON checkpoint: independently re-verify the selection before spending effort producing it ---
+    # --- Psalm 90:17 checkpoint: independently re-verify the selection before spending effort producing it ---
     ultron = UltronSupervisorAgent(db)
     score = (
         db.query(OpportunityScore)
@@ -161,7 +161,7 @@ def run_digital_product_pipeline(db: Session, mission_id: int | None = None, nic
     if any(f["status"] == "fail" for f in checkpoint_findings):
         reasons = "; ".join(f["detail"] for f in checkpoint_findings if f["status"] == "fail")
         run.completed_at = datetime.now(timezone.utc)
-        _touch(db, run, "opportunity_selection", "blocked_by_oversight", f"ULTRON blocked this run: {reasons}")
+        _touch(db, run, "opportunity_selection", "blocked_by_oversight", f"Psalm 90:17 blocked this run: {reasons}")
         _final_review(db, run)
         return run
 
@@ -212,12 +212,12 @@ def run_digital_product_pipeline(db: Session, mission_id: int | None = None, nic
         _final_review(db, run)
         return run
 
-    # --- ULTRON checkpoint: independently re-verify QA before this product is allowed into a listing ---
+    # --- Psalm 90:17 checkpoint: independently re-verify QA before this product is allowed into a listing ---
     qa_findings = ultron.verify_qa(product)
     if any(f["status"] == "fail" for f in qa_findings):
         reasons = "; ".join(f["detail"] for f in qa_findings if f["status"] == "fail")
         run.completed_at = datetime.now(timezone.utc)
-        _touch(db, run, "quality_assurance", "blocked_by_oversight", f"ULTRON blocked this run: {reasons}")
+        _touch(db, run, "quality_assurance", "blocked_by_oversight", f"Psalm 90:17 blocked this run: {reasons}")
         _final_review(db, run)
         return run
 

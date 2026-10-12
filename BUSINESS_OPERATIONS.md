@@ -1,6 +1,6 @@
 # Business Operations (Owner's Guide)
 
-This describes how you, the owner, actually operate ULTRON Commerce today
+This describes how you, the owner, actually operate Psalm 90:17 Commerce today
 -- not the eventual vision, the current reality.
 
 ## Right now, with zero credentials configured
@@ -47,7 +47,7 @@ In order, each step unlocks more real automation:
    next construction phases, deliberately sequenced after the digital
    pipeline proved out, per the spec's own Day 1-30 / 31-60 plan.
 
-## What ULTRON will never do without asking you
+## What Psalm 90:17 will never do without asking you
 
 - Spend money on advertising (`advertising_enabled=false` by default,
   enforced in the policy engine, not just the UI).
