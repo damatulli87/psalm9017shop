@@ -7,6 +7,7 @@ type Event = {
   id: number;
   event_type: string;
   actor: string;
+  actor_name: string;
   summary: string;
   created_at: string;
 };
@@ -15,6 +16,10 @@ function severity(eventType: string): "success" | "warn" | "error" {
   if (eventType.includes("fail") || eventType.includes("block") || eventType.includes("rejected")) return "error";
   if (eventType.includes("retry") || eventType.includes("requested") || eventType.includes("awaiting")) return "warn";
   return "success";
+}
+
+function titleCase(slug: string): string {
+  return slug.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
 export default function ActivityPage() {
@@ -41,11 +46,11 @@ export default function ActivityPage() {
           {events.map((e) => (
             <li key={e.id} className={`feed-line feed-${severity(e.event_type)}`}>
               <div className="flex justify-between gap-3">
-                <span className="chip chip-neon">{e.event_type}</span>
+                <span className="chip chip-neon">{titleCase(e.event_type)}</span>
                 <span className="label-dim shrink-0">{new Date(e.created_at).toLocaleString()}</span>
               </div>
               <div className="text-xs text-[var(--text-dim)] mt-1">
-                [{e.actor}] {e.summary}
+                <span className="font-medium text-[var(--text)]">{e.actor_name}</span> -- {e.summary}
               </div>
             </li>
           ))}

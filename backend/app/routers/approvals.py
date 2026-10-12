@@ -6,11 +6,15 @@ from sqlalchemy.orm import Session
 
 from app.auth.security import get_current_user
 from app.database import get_db
-from app.models.models import Approval
+from app.models.models import Agent, Approval
 from app.orchestration.workflow_engine import resume_after_approval
 from app.policy.engine import decide_approval
 
 router = APIRouter(prefix="/approvals", tags=["approvals"])
+
+
+def _agent_name_map(db: Session) -> dict[str, str]:
+    return {a.key: a.name for a in db.query(Agent.key, Agent.name).all()}
 
 
 class DecisionRequest(BaseModel):
@@ -24,11 +28,14 @@ def list_approvals(status_filter: str | None = None, db: Session = Depends(get_d
     if status_filter:
         q = q.filter(Approval.status == status_filter)
     approvals = q.order_by(Approval.id.desc()).limit(200).all()
+    names = _agent_name_map(db)
     return [
         {
             "id": a.id, "action_type": a.action_type, "summary": a.summary, "payload": a.payload,
             "estimated_cost_usd": a.estimated_cost_usd, "risk_level": a.risk_level, "status": a.status,
-            "requested_by_agent": a.requested_by_agent, "requested_at": a.requested_at,
+            "requested_by_agent": a.requested_by_agent,
+            "requested_by_agent_name": names.get(a.requested_by_agent, a.requested_by_agent),
+            "requested_at": a.requested_at,
             "decided_at": a.decided_at, "decided_by": a.decided_by,
         }
         for a in approvals
