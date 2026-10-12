@@ -19,11 +19,47 @@ export default function SettingsPage() {
   const [budget, setBudget] = useState<Budget | null>(null);
   const [integrations, setIntegrations] = useState<Integration[]>([]);
 
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [pwError, setPwError] = useState<string | null>(null);
+  const [pwSuccess, setPwSuccess] = useState(false);
+  const [pwSaving, setPwSaving] = useState(false);
+
   useEffect(() => {
     apiFetch<Policy[]>("/settings/policies").then(setPolicies).catch(() => {});
     apiFetch<Budget>("/settings/budget").then(setBudget).catch(() => {});
     apiFetch<Integration[]>("/settings/integrations").then(setIntegrations).catch(() => {});
   }, []);
+
+  async function handleChangePassword(e: React.FormEvent) {
+    e.preventDefault();
+    setPwError(null);
+    setPwSuccess(false);
+    if (newPassword !== confirmPassword) {
+      setPwError("New password and confirmation don't match.");
+      return;
+    }
+    if (newPassword.length < 12) {
+      setPwError("New password must be at least 12 characters.");
+      return;
+    }
+    setPwSaving(true);
+    try {
+      await apiFetch("/auth/change-password", {
+        method: "POST",
+        body: JSON.stringify({ current_password: currentPassword, new_password: newPassword }),
+      });
+      setPwSuccess(true);
+      setCurrentPassword("");
+      setNewPassword("");
+      setConfirmPassword("");
+    } catch (err) {
+      setPwError(err instanceof Error ? err.message : "Could not change password.");
+    } finally {
+      setPwSaving(false);
+    }
+  }
 
   return (
     <div className="space-y-6">
@@ -33,6 +69,49 @@ export default function SettingsPage() {
           Budgets and spend caps are hard-enforced server-side (app/config.py + policy engine) -- the UI is
           read-only for safety-critical limits in this build.
         </p>
+      </div>
+
+      <div className="panel p-5 max-w-md">
+        <h2 className="font-bold mb-3">Change Password</h2>
+        <form onSubmit={handleChangePassword} className="space-y-3">
+          <div>
+            <label className="label-dim block mb-1">Current Password</label>
+            <input
+              type="password"
+              className="w-full bg-black/40 border border-[var(--border)] rounded px-3 py-2 text-sm focus:outline-none focus:border-[var(--accent)]"
+              value={currentPassword}
+              onChange={(e) => setCurrentPassword(e.target.value)}
+              required
+            />
+          </div>
+          <div>
+            <label className="label-dim block mb-1">New Password</label>
+            <input
+              type="password"
+              className="w-full bg-black/40 border border-[var(--border)] rounded px-3 py-2 text-sm focus:outline-none focus:border-[var(--accent)]"
+              value={newPassword}
+              onChange={(e) => setNewPassword(e.target.value)}
+              minLength={12}
+              required
+            />
+          </div>
+          <div>
+            <label className="label-dim block mb-1">Confirm New Password</label>
+            <input
+              type="password"
+              className="w-full bg-black/40 border border-[var(--border)] rounded px-3 py-2 text-sm focus:outline-none focus:border-[var(--accent)]"
+              value={confirmPassword}
+              onChange={(e) => setConfirmPassword(e.target.value)}
+              minLength={12}
+              required
+            />
+          </div>
+          {pwError && <p className="text-[var(--danger)] text-sm">{pwError}</p>}
+          {pwSuccess && <p className="text-[var(--success-strong)] text-sm">Password changed successfully.</p>}
+          <button type="submit" disabled={pwSaving} className="btn-neon">
+            {pwSaving ? "Saving..." : "Update Password"}
+          </button>
+        </form>
       </div>
 
       {budget && (

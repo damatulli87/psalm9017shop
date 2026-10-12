@@ -35,7 +35,20 @@ export async function apiFetch<T = unknown>(
   const res = await fetch(`${API_BASE}${path}`, { ...options, headers });
   if (!res.ok) {
     const text = await res.text().catch(() => "");
-    throw new ApiError(res.status, text || res.statusText);
+    // FastAPI error bodies are {"detail": "..."} (or a validation-error array)
+    // -- surface that message directly instead of the raw JSON string.
+    let message = text || res.statusText;
+    try {
+      const parsed = JSON.parse(text);
+      if (typeof parsed?.detail === "string") {
+        message = parsed.detail;
+      } else if (Array.isArray(parsed?.detail)) {
+        message = parsed.detail.map((d: { msg?: string }) => d.msg).filter(Boolean).join("; ") || message;
+      }
+    } catch {
+      /* not JSON -- keep the raw text */
+    }
+    throw new ApiError(res.status, message);
   }
   if (res.status === 204) return undefined as T;
   return res.json() as Promise<T>;
