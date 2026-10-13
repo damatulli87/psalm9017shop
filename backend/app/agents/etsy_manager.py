@@ -1,11 +1,15 @@
 """Etsy Store Management Agent (spec section 12)."""
 from __future__ import annotations
 
+from pathlib import Path
+
+import httpx
+
 from app.agents.base import BaseAgent
 from app.config import settings
 from app.integrations import oauth_store
-from app.integrations.etsy import create_draft_listing
-from app.models.models import MarketplaceListing, ProductSpecification
+from app.integrations.etsy import create_draft_listing, upload_listing_image
+from app.models.models import MarketplaceListing, ProductAsset, ProductSpecification
 
 # Real Etsy seller-taxonomy leaf node ids (looked up live via
 # GET /v3/application/seller-taxonomy/nodes on 2026-10-13, not guessed --
@@ -60,6 +64,29 @@ def _taxonomy_id_for(product: ProductSpecification) -> int:
     return POD_TAXONOMY_BY_FORMAT.get(product.format, _POD_TAXONOMY_FALLBACK)
 
 
+def _listing_image_bytes(db, product: ProductSpecification) -> bytes | None:
+    """For POD, Printify's own real mockup (the design shown on the actual
+    physical product -- a proper product photo) is a far better listing
+    image than the raw print artwork, so it's preferred when available.
+    Falls back to our own generated/registered preview PNG otherwise."""
+    if product.product_type != "digital":
+        mockup_url = (product.design_brief or {}).get("pod", {}).get("mockup_image_url")
+        if mockup_url:
+            try:
+                resp = httpx.get(mockup_url, timeout=15)
+                resp.raise_for_status()
+                return resp.content
+            except Exception:  # noqa: BLE001
+                pass  # fall through to the local asset below
+
+    asset = db.query(ProductAsset).filter(
+        ProductAsset.product_id == product.id, ProductAsset.asset_type == "png"
+    ).first()
+    if asset and Path(asset.file_path).exists():
+        return Path(asset.file_path).read_bytes()
+    return None
+
+
 class EtsyManagerAgent(BaseAgent):
     key = "etsy_manager"
 
@@ -102,4 +129,28 @@ class EtsyManagerAgent(BaseAgent):
             f"{'SIMULATED' if result.simulated else ('REAL' if result.success else 'FAILED')} -- {result.detail}",
             {"listing_id": listing.id, "etsy_configured": settings.etsy_configured, "success": result.success},
         )
+
+        # create_draft_listing() alone leaves the real listing with
+        # images: null -- confirmed live (the first real listing created
+        # had no photos). Etsy requires a separate upload call per image.
+        if result.success and result.external_listing_id and access_token:
+            image_bytes = _listing_image_bytes(self.db, product)
+            if image_bytes:
+                uploaded, detail = upload_listing_image(
+                    access_token=access_token,
+                    listing_id=result.external_listing_id,
+                    image_bytes=image_bytes,
+                    alt_text=product.title[:500],
+                )
+                self.log(
+                    "listing_image_uploaded" if uploaded else "listing_image_upload_failed",
+                    f"Listing #{listing.id} image upload: {detail}",
+                    {"listing_id": listing.id, "uploaded": uploaded},
+                )
+            else:
+                self.log(
+                    "listing_image_upload_skipped",
+                    f"No image available to upload for product #{product.id}.",
+                    {"listing_id": listing.id},
+                )
         return listing

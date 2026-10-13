@@ -183,3 +183,23 @@ def create_draft_listing(
             success=False, simulated=False, external_listing_id=None,
             detail=f"Etsy API call failed: {exc}", request_payload=payload,
         )
+
+
+def upload_listing_image(
+    *, access_token: str, listing_id: str, image_bytes: bytes, rank: int = 1, alt_text: str = "",
+) -> tuple[bool, str]:
+    """Real multipart upload -- confirmed live that create_draft_listing()
+    alone leaves `images: null` on the real listing; Etsy requires this
+    separate call per image, it's not part of listing creation."""
+    try:
+        resp = httpx.post(
+            f"{ETSY_API_BASE}/shops/{settings.etsy_shop_id}/listings/{listing_id}/images",
+            headers={"x-api-key": _api_key_header(), "Authorization": f"Bearer {access_token}"},
+            files={"image": ("listing.png", image_bytes, "image/png")},
+            data={"rank": rank, "alt_text": alt_text[:500]},
+            timeout=30,
+        )
+        resp.raise_for_status()
+        return True, "Listing image uploaded."
+    except Exception as exc:  # noqa: BLE001
+        return False, f"Etsy image upload failed: {exc}"

@@ -21,6 +21,23 @@ from app.models.models import MarketOpportunity, ProductSpecification
 BANNED_PHRASES = ["limited time", "only today", "act now", "guaranteed results"]
 AI_DISCLOSURE_MARKER = "assistance of AI tools"
 
+# Real material facts for the standard blank used per POD product type (see
+# app/agents/pod_production.py for the actual Printify blueprint each one
+# maps to) -- added after a real listing was confirmed to look sparse with
+# just a one-line format note. Not marketing fluff, just what the item
+# actually is.
+POD_MATERIALS_BY_FORMAT = {
+    "tshirt": "100% combed, ring-spun cotton (heather colors are cotton/poly blend)",
+    "mug": "11oz ceramic, dishwasher and microwave safe",
+    "hoodie": "Sponge fleece cotton/polyester blend, soft and warm",
+    "tote": "Durable canvas",
+    "sticker": "Weatherproof vinyl, kiss-cut",
+    "cap": "Cotton twill, adjustable",
+    "necklace": "Stainless steel pendant, one size",
+    "notebook": "Hardcover, 5.5\" x 8.5\"",
+    "tumbler": "Insulated 20oz stainless steel, double-wall",
+}
+
 
 def _clean_ai_narrative(raw: str) -> str | None:
     """target_customer holds the raw AI response text. Keep listing copy to a
@@ -37,8 +54,12 @@ class SEOAgent(BaseAgent):
 
     def build_listing_copy(self, product: ProductSpecification, opportunity: MarketOpportunity | None) -> dict:
         niche = opportunity.niche_title if opportunity else product.title
-        title = f"{product.title} | Printable {niche} | Instant Digital Download" \
-            if product.product_type == "digital" else f"{product.title} | {niche}"
+        # product.title already includes the niche name ("<niche> - Starter
+        # Edition"), so appending niche again here produced a visibly
+        # duplicated title on a real listing ("X - Starter Edition | X") --
+        # confirmed live. Add a real differentiator instead of repeating it.
+        title = f"{product.title} - Printable Instant Download" \
+            if product.product_type == "digital" else f"{product.title} - Custom {product.format.title()} Gift"
         title = title[:140]
 
         parts = [
@@ -46,10 +67,13 @@ class SEOAgent(BaseAgent):
             "",
             product.problem_solved,
             "",
-            f"Format: {product.format.upper()}. "
-            + ("Instant digital download -- no physical item is shipped."
-               if product.product_type == "digital" else "Printed and shipped by our production partner."),
         ]
+        if product.product_type == "digital":
+            parts.append(f"Format: {product.format.upper()}. Instant digital download -- no physical item is shipped.")
+        else:
+            material = POD_MATERIALS_BY_FORMAT.get(product.format)
+            details = [f"Material: {material}." if material else None, "Made to order and shipped by our production partner.", "Free shipping. Processing time: 10 business days before shipment."]
+            parts.append("\n".join(d for d in details if d))
 
         if product.target_customer_is_ai:
             narrative = _clean_ai_narrative(product.target_customer)
