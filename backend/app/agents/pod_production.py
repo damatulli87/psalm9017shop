@@ -20,7 +20,13 @@ create_product() call before being priced in product_strategy.py:
     $6.44.
   - Hoodie: blueprint 175 "Unisex Sponge Fleece Pullover Hoodie"
     (Bella+Canvas) x print provider 99 "Printify Choice". Black+White,
-    S-2XL (10 variants). Real cost: $37.55-$40.84.
+    S-2XL (10 variants). Real cost: $37.55-$40.84. Considered switching
+    to a cheaper Gildan blank (blueprint 1525, ~$27 real cost) when the
+    owner asked about cheaper hoodie options, but the owner then
+    clarified comfort/quality mattered more than lowest cost --
+    Bella+Canvas is consistently the most-cited "soft, quality blank"
+    pick in POD-seller comparisons (combed ring-spun cotton), so kept
+    the original choice rather than trading quality for margin.
   - Tote bag: blueprint 507 "Canvas Tote Bag, 5-Color Straps" x print
     provider 99 "Printify Choice". Black+White, both sizes (4 variants).
     Real cost: $18.74-$20.05.

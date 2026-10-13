@@ -24,7 +24,7 @@ from app.config import settings
 ETSY_API_BASE = "https://openapi.etsy.com/v3/application"
 ETSY_OAUTH_AUTHORIZE_URL = "https://www.etsy.com/oauth/connect"
 ETSY_OAUTH_TOKEN_URL = "https://api.etsy.com/v3/public/oauth/token"
-ETSY_SCOPES = "listings_w listings_r shops_r transactions_r"
+ETSY_SCOPES = "listings_w listings_r shops_r shops_w transactions_r"
 
 
 def _api_key_header() -> str:
@@ -105,6 +105,7 @@ def create_draft_listing(
     price_usd: float,
     tags: list[str],
     is_digital: bool,
+    taxonomy_id: int,
 ) -> EtsyListingResult:
     payload = {
         # Neither digital files nor Printify POD (print-on-demand, no fixed
@@ -116,14 +117,15 @@ def create_draft_listing(
         "price": round(price_usd, 2),
         "who_made": "i_did",
         "when_made": "2020_2026",
-        "taxonomy_id": 0,
+        "taxonomy_id": taxonomy_id,
         "tags": tags[:13],
         "is_digital": is_digital,
         "state": "draft",
     }
     if not is_digital:
-        # Etsy requires a shipping_profile_id for every physical listing.
+        # Etsy requires both for every physical listing.
         payload["shipping_profile_id"] = settings.etsy_shipping_profile_id
+        payload["readiness_state_id"] = settings.etsy_readiness_state_id
 
     if not settings.etsy_configured or not access_token:
         return EtsyListingResult(
@@ -147,6 +149,18 @@ def create_draft_listing(
                 "listing -- that's a real shipping-cost decision, not something to guess. Create "
                 "one in Etsy's Shop Manager > Settings > Shipping settings, or ask to have one "
                 "created via the API with specific real rates."
+            ),
+            request_payload=payload,
+        )
+    if not is_digital and not settings.etsy_readiness_state_id:
+        return EtsyListingResult(
+            success=False,
+            simulated=True,
+            external_listing_id=None,
+            detail=(
+                "Cannot create a real physical listing: no ETSY_READINESS_STATE_ID configured. "
+                "Etsy requires a shop-level readiness-state-definition (made_to_order vs "
+                "ready_to_ship + processing time) for every physical listing."
             ),
             request_payload=payload,
         )

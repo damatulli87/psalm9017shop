@@ -31,24 +31,48 @@ DIGITAL_FORMAT_BY_NICHE = {
 # Prices set with a real margin above verified Printify fulfillment cost
 # (see app/agents/pod_production.py catalog comments for the real cost each
 # product type returned) -- not arbitrary guesses.
+# Prices assume FREE shipping to the buyer (shipping cost absorbed here,
+# not charged separately -- see ETSY_SHIPPING_PROFILE_ID in backend/.env).
+# Set 2026-10-13 from real Printify cost + real worst-case US shipping
+# quote (via /catalog/.../shipping.json) plus a real competitive-pricing
+# check (Etsy listing-price research for each category), not guessed:
+#   type      real cost  real ship(worst)  price   margin(worst case)
+#   tshirt    $11.77     $7.99             $26.00  $6.24   (market ~$20-28)
+#   mug       $6.44      $7.29             $19.00  $5.27   (market ~$16-25)
+#   hoodie    $40.84     $8.79             $56.00  $6.37   (market ~$35-50 -- priced above the
+#                                                            typical range deliberately: owner
+#                                                            confirmed comfort/quality matters more
+#                                                            than lowest cost, so this stays on
+#                                                            Bella+Canvas [most-cited "soft, quality
+#                                                            blank" pick] rather than a cheaper
+#                                                            Gildan option, and the price reflects
+#                                                            that real cost rather than chasing the
+#                                                            market median)
+#   tote      $20.05     $6.09             $32.00  $5.86   (market ~$18-20 median, up to $35)
+#   sticker   $2.32      $4.59             $8.00   $1.09   (market singles ~$3.50-5; thin margin
+#                                                            is normal for single stickers)
+#   cap       $15.38     $5.09             $27.00  $6.53   (market ~$25-27)
+#   necklace  $13.47     $5.89             $34.00  $14.64  (market ~$30-46 for cross/pendant)
+#   notebook  $15.63     $6.19             $28.00  $6.18   (market ~$24-30)
+#   tumbler   $24.97     $6.69             $38.00  $6.34   (market ~$25 median, $25-50 common)
 POD_FORMAT_BY_NICHE = {
-    "Funny Cat-Lover T-Shirts": ("tshirt", 24.00),
-    "Motivational Quote Mugs": ("mug", 16.00),
-    "Teacher Appreciation POD Gifts": ("tshirt", 22.00),
-    "Faith-Based Graphic T-Shirts": ("tshirt", 24.00),
-    "Scripture Verse Coffee Mugs": ("mug", 16.00),
-    "Christian Faith Pullover Hoodies": ("hoodie", 54.00),
-    "Dog Mom Pullover Hoodies": ("hoodie", 54.00),
-    "Wedding Party Tote Bags": ("tote", 29.00),
-    "Teacher Appreciation Tote Bags": ("tote", 27.00),
-    "Motivational Quote Sticker Packs": ("sticker", 6.00),
-    "Christian Faith Sticker Packs": ("sticker", 6.00),
-    "Nurse Appreciation T-Shirts": ("tshirt", 24.00),
-    "Zodiac Sign Coffee Mugs": ("mug", 16.00),
-    "Christian Faith Baseball Caps": ("cap", 27.00),  # real cost $15.38
-    "Faith Cross Necklaces": ("necklace", 30.00),  # real cost $13.47
-    "Daily Gratitude Journal Notebooks": ("notebook", 23.00),  # real cost $15.63
-    "Motivational Quote Tumblers": ("tumbler", 35.00),  # real cost $24.97
+    "Funny Cat-Lover T-Shirts": ("tshirt", 26.00),
+    "Motivational Quote Mugs": ("mug", 19.00),
+    "Teacher Appreciation POD Gifts": ("tshirt", 26.00),
+    "Faith-Based Graphic T-Shirts": ("tshirt", 26.00),
+    "Scripture Verse Coffee Mugs": ("mug", 19.00),
+    "Christian Faith Pullover Hoodies": ("hoodie", 56.00),
+    "Dog Mom Pullover Hoodies": ("hoodie", 56.00),
+    "Wedding Party Tote Bags": ("tote", 32.00),
+    "Teacher Appreciation Tote Bags": ("tote", 32.00),
+    "Motivational Quote Sticker Packs": ("sticker", 8.00),
+    "Christian Faith Sticker Packs": ("sticker", 8.00),
+    "Nurse Appreciation T-Shirts": ("tshirt", 26.00),
+    "Zodiac Sign Coffee Mugs": ("mug", 19.00),
+    "Christian Faith Baseball Caps": ("cap", 27.00),
+    "Faith Cross Necklaces": ("necklace", 34.00),
+    "Daily Gratitude Journal Notebooks": ("notebook", 28.00),
+    "Motivational Quote Tumblers": ("tumbler", 38.00),
 }
 
 _JSON_FENCE_RE = re.compile(r"^```(?:json)?\s*|\s*```$", re.MULTILINE)

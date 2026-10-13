@@ -244,6 +244,16 @@ def run_digital_product_pipeline(db: Session, mission_id: int | None = None, nic
     listing = etsy_agent.prepare_listing_draft(
         product, seo_title=copy["title"], seo_description=copy["description"], tags=copy["tags"]
     )
+    if listing.status == "creation_failed":
+        # A real (non-simulated) Etsy API call actually failed -- do NOT
+        # proceed to request owner approval to publish a listing that
+        # doesn't exist. Confirmed this path is reachable live (a bad
+        # taxonomy_id 400'd the first real listing-creation attempt).
+        _complete_task(db, t, {"listing_id": listing.id, "note": "Real Etsy listing creation failed."}, status="failed")
+        run.completed_at = datetime.now(timezone.utc)
+        _touch(db, run, "listing_creation", "failed", "Real Etsy listing creation failed; nothing to approve.")
+        _final_review(db, run)
+        return run
     _complete_task(db, t, {"listing_id": listing.id, "simulated": listing.is_simulated})
 
     # --- Stage 8: authorization ---

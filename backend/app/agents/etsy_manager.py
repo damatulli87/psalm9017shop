@@ -7,6 +7,58 @@ from app.integrations import oauth_store
 from app.integrations.etsy import create_draft_listing
 from app.models.models import MarketplaceListing, ProductSpecification
 
+# Real Etsy seller-taxonomy leaf node ids (looked up live via
+# GET /v3/application/seller-taxonomy/nodes on 2026-10-13, not guessed --
+# a real listing creation call failed with "IDs must be >= 1, got 0" the
+# first time it ran for real, since taxonomy_id was hardcoded to 0).
+DIGITAL_TAXONOMY_BY_NICHE = {
+    "Printable Chore Charts": 12479,  # Chore Chart Templates
+    "Printable Budget Planners": 12487,  # Personal Finance Templates
+    "Wedding Planning Templates": 12481,  # Event Program Templates
+    "Small Business Invoice Templates": 12478,  # Bookkeeping Templates
+    "Printable Daily Planners": 12476,  # Planner Templates
+    "Digital Journal Templates": 12475,  # Journal Templates
+    "Home Office Productivity Planners": 12476,  # Planner Templates
+    "Bible Verse Printable Wall Art": 2078,  # Digital Prints
+    "Prayer Journal Printable": 12475,  # Journal Templates
+    "Bible Study Planner": 12476,  # Planner Templates
+    "Sunday School Activity Worksheets": 12471,  # Worksheets
+    "Weekly Meal Planner Printable": 12476,  # Planner Templates
+    "Habit Tracker Printable": 12476,  # Planner Templates
+    "Workout Planner Printable": 12476,  # Planner Templates
+    "Baby Shower Planning Printable": 12481,  # Event Program Templates
+    "Wedding Seating Chart Template": 12481,  # Event Program Templates
+    "Social Media Content Planner Printable": 12486,  # Social Media Templates
+    "Debt Payoff Tracker Printable": 12487,  # Personal Finance Templates
+}
+# POD taxonomy maps by physical product type (product.format), not niche --
+# the category is about the physical item, not its theme.
+POD_TAXONOMY_BY_FORMAT = {
+    "tshirt": 482,  # Clothing > Gender-Neutral Adult Clothing > Tops & Tees > T-shirts
+    "mug": 1062,  # Mugs
+    "hoodie": 1853,  # Clothing > Gender-Neutral Adult Clothing > Hoodies & Sweatshirts > Hoodies
+    "tote": 190,  # Bags & Purses > Totes
+    "sticker": 1326,  # Stickers
+    "cap": 25,  # Accessories > Hats & Head Coverings > Hats & Caps
+    "necklace": 1229,  # Jewelry > Necklaces > Pendant Necklaces
+    "notebook": 326,  # Journals & Notebooks
+    "tumbler": 6729,  # Tumblers
+}
+# Safe, valid (non-zero) fallbacks for any niche added without a mapping
+# above -- should never actually trigger since every current niche is
+# mapped, but 0 is never valid, so this is the defensive floor.
+_DIGITAL_TAXONOMY_FALLBACK = 2078  # Digital Prints
+_POD_TAXONOMY_FALLBACK = 482  # T-shirts
+
+
+def _taxonomy_id_for(product: ProductSpecification) -> int:
+    if product.product_type == "digital":
+        for niche_title, tax_id in DIGITAL_TAXONOMY_BY_NICHE.items():
+            if product.title.startswith(niche_title):
+                return tax_id
+        return _DIGITAL_TAXONOMY_FALLBACK
+    return POD_TAXONOMY_BY_FORMAT.get(product.format, _POD_TAXONOMY_FALLBACK)
+
 
 class EtsyManagerAgent(BaseAgent):
     key = "etsy_manager"
@@ -21,8 +73,14 @@ class EtsyManagerAgent(BaseAgent):
             price_usd=product.recommended_price_usd,
             tags=tags,
             is_digital=(product.product_type == "digital"),
+            taxonomy_id=_taxonomy_id_for(product),
         )
 
+        # A real (non-simulated) API call can still fail -- confirmed live
+        # (a bad taxonomy_id 400'd). That's NOT the same as a successful
+        # simulated/real draft and must not be recorded as one, or the
+        # pipeline would go on to request owner approval to publish a
+        # listing that doesn't actually exist on Etsy.
         listing = MarketplaceListing(
             product_id=product.id,
             storefront_channel="etsy",
@@ -31,8 +89,8 @@ class EtsyManagerAgent(BaseAgent):
             description=seo_description,
             price_usd=product.recommended_price_usd,
             tags=tags,
-            is_simulated=result.simulated,
-            status="draft",
+            is_simulated=not result.success,
+            status="draft" if (result.success or result.simulated) else "creation_failed",
         )
         self.db.add(listing)
         self.db.commit()
@@ -40,7 +98,8 @@ class EtsyManagerAgent(BaseAgent):
 
         self.log(
             "listing_draft_prepared",
-            f"Etsy draft for product #{product.id}: {'SIMULATED' if result.simulated else 'REAL'} -- {result.detail}",
-            {"listing_id": listing.id, "etsy_configured": settings.etsy_configured},
+            f"Etsy draft for product #{product.id}: "
+            f"{'SIMULATED' if result.simulated else ('REAL' if result.success else 'FAILED')} -- {result.detail}",
+            {"listing_id": listing.id, "etsy_configured": settings.etsy_configured, "success": result.success},
         )
         return listing

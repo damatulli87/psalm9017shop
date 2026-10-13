@@ -65,6 +65,14 @@ class Settings(BaseSettings):
     # is set to a real profile id (create one in Etsy's shop settings UI,
     # or ask the assistant to create one via the API with real rates).
     etsy_shipping_profile_id: str | None = None
+    # Also required by Etsy for any physical listing. Real, created via
+    # POST /shops/{shop_id}/readiness-state-definitions (2026-10-13):
+    # readiness_state=made_to_order (accurate -- Printify POD has no
+    # inventory, every order is produced after purchase), 2-7 day
+    # processing window (Printify's typical production time). Not a
+    # revenue decision like shipping cost, so a real Printify-typical
+    # default was used rather than asking the owner to pick a number.
+    etsy_readiness_state_id: str | None = None
     frontend_base_url: str = "http://localhost:3000"
 
     printify_api_token: str | None = None
