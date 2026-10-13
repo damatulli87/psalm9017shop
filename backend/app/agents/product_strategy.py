@@ -16,11 +16,17 @@ DIGITAL_FORMAT_BY_NICHE = {
     "Printable Daily Planners": ("pdf", 8.00),
     "Digital Journal Templates": ("pdf", 10.00),
     "Home Office Productivity Planners": ("xlsx", 9.00),
+    "Bible Verse Printable Wall Art": ("pdf", 6.00),
+    "Prayer Journal Printable": ("pdf", 8.00),
+    "Bible Study Planner": ("pdf", 9.00),
+    "Sunday School Activity Worksheets": ("pdf", 5.00),
 }
 POD_FORMAT_BY_NICHE = {
     "Funny Cat-Lover T-Shirts": ("tshirt", 24.00),
     "Motivational Quote Mugs": ("mug", 16.00),
     "Teacher Appreciation POD Gifts": ("tshirt", 22.00),
+    "Faith-Based Graphic T-Shirts": ("tshirt", 24.00),
+    "Scripture Verse Coffee Mugs": ("mug", 16.00),
 }
 
 _JSON_FENCE_RE = re.compile(r"^```(?:json)?\s*|\s*```$", re.MULTILINE)
