@@ -150,7 +150,13 @@ class ProductStrategyAgent(BaseAgent):
 
         spec = ProductSpecification(
             opportunity_id=opportunity.id,
-            title=f"{opportunity.niche_title} - Starter Edition",
+            # Was f"{niche_title} - Starter Edition" -- an internal MVP/dev
+            # naming convention that leaked straight into real customer-
+            # facing Etsy listing titles and descriptions (confirmed live:
+            # the owner found it on an actual listing). Removed; there is
+            # no "non-starter edition" concept this ever needed to
+            # distinguish from.
+            title=opportunity.niche_title,
             product_type=opportunity.category,
             target_customer=target_customer_text,
             target_customer_is_ai=narrative_is_ai,

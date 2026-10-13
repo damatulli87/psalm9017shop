@@ -15,7 +15,11 @@ confirm the disclosure is present if and only if it should be.
 """
 from __future__ import annotations
 
+import json
+import re
+
 from app.agents.base import BaseAgent
+from app.integrations import ai_providers
 from app.models.models import MarketOpportunity, ProductSpecification
 
 BANNED_PHRASES = ["limited time", "only today", "act now", "guaranteed results"]
@@ -49,15 +53,56 @@ def _clean_ai_narrative(raw: str) -> str | None:
     return text[:400].rsplit(". ", 1)[0] + "." if len(text) > 400 else text
 
 
+_JSON_FENCE_RE = re.compile(r"^```(?:json)?\s*|\s*```$", re.MULTILINE)
+
+
+def _fallback_tags(niche: str, product: ProductSpecification) -> list[str]:
+    """Used when no real AI key is configured -- real buyer-relevant words
+    only (niche keywords + format), never internal/dev terms like a brand
+    or build-system name that has nothing to do with what a buyer searches
+    for (confirmed live: an "ultron commerce" tag ended up on a real
+    listing this way)."""
+    base = niche.lower().replace("-", " ").split()
+    extra = [product.format] if product.product_type != "digital" else ["printable", "digital download"]
+    return list(dict.fromkeys(base + extra))[:13]
+
+
+def _ai_tags(db, agent_key: str, product: ProductSpecification, niche: str) -> list[str] | None:
+    """Real Etsy tags should be phrases a buyer would actually search --
+    not a mechanical split of the niche name. Asks the real model for
+    buyer-search-style tags; returns None (caller falls back) on a mock
+    response or anything that doesn't parse as the requested JSON array."""
+    resp = ai_providers.complete(
+        db,
+        agent_key=agent_key,
+        system_prompt="You write Etsy listing tags. Respond with ONLY a JSON array of strings, nothing else.",
+        user_prompt=(
+            f"Niche: {niche}\nProduct type: {product.format}\nTarget buyer: {product.target_customer}\n\n"
+            f"Give up to 13 Etsy tags (each max 20 characters, multi-word phrases allowed) that a real buyer "
+            f"would actually type into Etsy search to find this item. Favor specific, descriptive buyer-search "
+            f"phrases over generic single words. Do not include the seller's shop/brand name or any internal "
+            f"tool/platform name. Respond with ONLY a JSON array of strings."
+        ),
+        task_hint="listing_tags",
+        complexity="routine",
+    )
+    if resp.is_mock:
+        return None
+    try:
+        parsed = json.loads(_JSON_FENCE_RE.sub("", resp.text.strip()))
+    except (json.JSONDecodeError, TypeError):
+        return None
+    if not isinstance(parsed, list) or not all(isinstance(t, str) for t in parsed):
+        return None
+    tags = [t.strip()[:20] for t in parsed if t.strip()]
+    return list(dict.fromkeys(tags))[:13] or None
+
+
 class SEOAgent(BaseAgent):
     key = "seo"
 
     def build_listing_copy(self, product: ProductSpecification, opportunity: MarketOpportunity | None) -> dict:
         niche = opportunity.niche_title if opportunity else product.title
-        # product.title already includes the niche name ("<niche> - Starter
-        # Edition"), so appending niche again here produced a visibly
-        # duplicated title on a real listing ("X - Starter Edition | X") --
-        # confirmed live. Add a real differentiator instead of repeating it.
         title = f"{product.title} - Printable Instant Download" \
             if product.product_type == "digital" else f"{product.title} - Custom {product.format.title()} Gift"
         title = title[:140]
@@ -84,12 +129,11 @@ class SEOAgent(BaseAgent):
 
         description = "\n".join(parts)
 
-        for phrase in BANNED_PHRASES:
-            if phrase in description.lower():
-                raise ValueError(f"Blocked deceptive phrase in generated copy: '{phrase}'")
+        tags = _ai_tags(self.db, self.key, product, niche) or _fallback_tags(niche, product)
 
-        base_tags = niche.lower().replace("-", " ").split()
-        tags = list(dict.fromkeys(base_tags + [product.format, product.product_type, "ultron commerce"]))[:13]
+        for phrase in BANNED_PHRASES:
+            if phrase in description.lower() or any(phrase in t.lower() for t in tags):
+                raise ValueError(f"Blocked deceptive phrase in generated copy: '{phrase}'")
 
         copy = {"title": title, "description": description, "tags": tags}
         self.log(

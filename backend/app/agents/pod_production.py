@@ -150,18 +150,46 @@ def _lookup_catalog(title: str) -> dict | None:
     return None
 
 
+_PHYSICAL_OBJECT_NAMES = (
+    "mug, cup, t-shirt, shirt, hoodie, sweatshirt, tote bag, bag, sticker, "
+    "baseball cap, hat, necklace, pendant, jewelry, notebook, journal, book, "
+    "tumbler, bottle, or any other physical product, package, or object"
+)
+
+
 def _print_artwork_prompt(product: ProductSpecification) -> str:
     """Standalone graphic design, not a lifestyle photo -- centered subject,
     no legible text (same garbled-text failure mode as listing photos, see
     image_providers.py / digital_production.py), transparent-friendly
-    background since it gets placed onto a real garment/mug by Printify."""
+    background since it gets placed onto a real garment/mug by Printify.
+
+    Confirmed live (owner feedback): passing the niche title verbatim (e.g.
+    "Faith Cross Necklaces") made the model draw a picture OF necklaces
+    rather than a design to print ONTO a necklace -- it took the product
+    category as the subject. Theme now comes from problem_solved/
+    target_customer instead (never names the physical object), plus an
+    explicit negative instruction not to depict any physical product at
+    all. Also asks for a style informed by what generally sells well in
+    the genre, not a specific copied design -- a cheap, real way to bias
+    toward "inspired by proven styles" without reproducing anyone's actual
+    artwork or needing real competitive-listing image data we don't have."""
     return (
-        f"A clean, centered standalone graphic design for printing on a "
-        f"physical product, in the theme of '{product.title}', aimed at "
-        f"this buyer: {product.target_customer} Bold simple shapes, "
-        f"flat illustration style suitable for screen printing, plain "
-        f"white or transparent background, no legible text, letters, or "
-        f"words anywhere in the image, no logos or brand names."
+        f"A standalone decorative graphic design/motif meant to be printed "
+        f"flat onto a physical item's surface (like clipart or a tattoo "
+        f"stencil) -- NOT a picture of {_PHYSICAL_OBJECT_NAMES}. Design "
+        f"theme: something that would resonate with this buyer: "
+        f"{product.target_customer} The design should reflect this idea: "
+        f"{product.problem_solved} Style it the way a popular, well-selling "
+        f"design in this general genre typically looks -- bold simple "
+        f"shapes, flat illustration style suitable for screen printing -- "
+        f"but create an original piece only inspired by common successful "
+        f"visual conventions in the genre, never a copy of any specific "
+        f"existing design. The background MUST be solid flat pure white "
+        f"(#FFFFFF), edge to edge, with no gradient, vignette, shadow, "
+        f"texture, or color variation anywhere in the background -- only "
+        f"the design itself may have color. No legible text, letters, or "
+        f"words anywhere in the image, no logos or brand names, no "
+        f"depiction of the physical product it will be printed on."
     )
 
 

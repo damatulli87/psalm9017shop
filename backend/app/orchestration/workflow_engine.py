@@ -256,6 +256,16 @@ def run_digital_product_pipeline(db: Session, mission_id: int | None = None, nic
         return run
     _complete_task(db, t, {"listing_id": listing.id, "simulated": listing.is_simulated})
 
+    # --- Psalm 90:17 checkpoint: deterministic content hygiene before this listing is
+    # ever eligible for owner approval (no internal/dev terms, no duplicated title) ---
+    hygiene_findings = ultron.verify_listing_hygiene(product)
+    if any(f["status"] == "fail" for f in hygiene_findings):
+        reasons = "; ".join(f["detail"] for f in hygiene_findings if f["status"] == "fail")
+        run.completed_at = datetime.now(timezone.utc)
+        _touch(db, run, "listing_creation", "blocked_by_oversight", f"Psalm 90:17 blocked this run: {reasons}")
+        _final_review(db, run)
+        return run
+
     # --- Stage 8: authorization ---
     t = _task(db, run, "authorization", "ultron")
     t.started_at = datetime.now(timezone.utc)

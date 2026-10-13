@@ -25,6 +25,7 @@ Psalm 90:17 cannot resolve its own concerns; it can only raise them.
 """
 from __future__ import annotations
 
+import re
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
@@ -151,7 +152,14 @@ class UltronSupervisorAgent(BaseAgent):
 
     def verify_publish_authorization(self, product: ProductSpecification) -> list[dict]:
         findings = []
-        listing = self.db.query(MarketplaceListing).filter(MarketplaceListing.product_id == product.id).first()
+        # Most recent listing for this product, not just "first found" --
+        # a product can end up with more than one MarketplaceListing row
+        # (confirmed live: a reused product_id after test cleanup left a
+        # stale row around), and checking a stale one defeats the point of
+        # independently re-verifying the CURRENT real state.
+        listing = self.db.query(MarketplaceListing).filter(
+            MarketplaceListing.product_id == product.id
+        ).order_by(MarketplaceListing.id.desc()).first()
         if not listing:
             return findings
 
@@ -192,7 +200,9 @@ class UltronSupervisorAgent(BaseAgent):
         from app.agents.seo import AI_DISCLOSURE_MARKER
 
         findings = []
-        listing = self.db.query(MarketplaceListing).filter(MarketplaceListing.product_id == product.id).first()
+        listing = self.db.query(MarketplaceListing).filter(
+            MarketplaceListing.product_id == product.id
+        ).order_by(MarketplaceListing.id.desc()).first()
         if not listing:
             return findings
 
@@ -217,6 +227,51 @@ class UltronSupervisorAgent(BaseAgent):
                 f"Listing #{listing.id}'s AI disclosure ({'present' if disclosed else 'absent'}) matches actual "
                 f"AI involvement ({actually_ai}).",
             ))
+        return findings
+
+    # Internal/dev terms that have no business reaching a real customer-
+    # facing listing -- confirmed live: "ultron commerce" ended up in real
+    # tags, and "starter edition" (an internal MVP-naming convention) ended
+    # up in a real title and description. This is intentionally deterministic
+    # (see module docstring) -- it catches a specific, named, re-derivable
+    # defect, not a subjective quality opinion.
+    FORBIDDEN_CUSTOMER_FACING_TERMS = ("ultron", "starter edition", "mock_llm")
+
+    def verify_listing_hygiene(self, product: ProductSpecification) -> list[dict]:
+        """Deterministic content checks Psalm 90:17 CAN do without forming
+        an opinion: real internal/dev terms leaking into real customer-
+        facing text, and a title that literally repeats the same phrase
+        (exactly what "X - Starter Edition | X - Starter Edition" was).
+        What this can't do -- and deliberately doesn't attempt, consistent
+        with this file having no LLM calls -- is judge whether generated
+        artwork actually makes visual sense for the product it's printed
+        on; that's a judgment call, not a measurable fact, and belongs in
+        a separate, clearly-labeled review step if it's ever built, not
+        folded into this deterministic verifier."""
+        findings = []
+        listing = self.db.query(MarketplaceListing).filter(
+            MarketplaceListing.product_id == product.id
+        ).order_by(MarketplaceListing.id.desc()).first()
+        if not listing:
+            return findings
+
+        leaked = []
+        fields = {"title": listing.title, "description": listing.description, "tags": " ".join(listing.tags or [])}
+        for field, text in fields.items():
+            for term in self.FORBIDDEN_CUSTOMER_FACING_TERMS:
+                if term in (text or "").lower():
+                    leaked.append(f"{field} contains internal term '{term}'")
+        if leaked:
+            findings.append(_finding("listing_hygiene_no_internal_terms", FAIL, f"Listing #{listing.id}: {'; '.join(leaked)}."))
+        else:
+            findings.append(_finding("listing_hygiene_no_internal_terms", PASS, "No internal/dev terms found in listing title/description/tags."))
+
+        segments = [s.strip().lower() for s in re.split(r"\s*[|•]\s*", listing.title or "") if s.strip()]
+        if len(segments) != len(set(segments)):
+            findings.append(_finding("listing_hygiene_no_duplicated_title", FAIL, f"Listing #{listing.id} title repeats the same segment: '{listing.title}'."))
+        else:
+            findings.append(_finding("listing_hygiene_no_duplicated_title", PASS, "Title does not repeat the same segment."))
+
         return findings
 
     def verify_tasks(self, run: WorkflowRun) -> list[dict]:
@@ -280,6 +335,7 @@ class UltronSupervisorAgent(BaseAgent):
                 findings += self.verify_qa(product)
                 findings += self.verify_publish_authorization(product)
                 findings += self.verify_ai_disclosure_accuracy(product)
+                findings += self.verify_listing_hygiene(product)
 
         verdict = _verdict_from(findings)
         fail_count = sum(1 for f in findings if f["status"] == FAIL)
