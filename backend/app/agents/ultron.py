@@ -128,7 +128,11 @@ class UltronSupervisorAgent(BaseAgent):
         else:
             findings.append(_finding("qa_status_consistency", PASS, f"product.status matches independently recomputed QA result ({len(qa_rows)} checks)."))
 
-        expected_checks = {"main_file_exists", "preview_image_valid", "zip_package_valid"}
+        expected_checks = (
+            {"main_file_exists", "preview_image_valid", "zip_package_valid"}
+            if product.product_type == "digital"
+            else {"pod_artwork_exists", "printify_product_created", "real_cost_recorded"}
+        )
         present_checks = {r.check_name for r in qa_rows}
         missing = expected_checks - present_checks
         if missing:

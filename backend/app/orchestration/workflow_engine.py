@@ -185,11 +185,10 @@ def run_digital_product_pipeline(db: Session, mission_id: int | None = None, nic
     # --- Stage 5: production ---
     if product.product_type != "digital":
         # POD: real Printify catalog/cost/artwork call (app/agents/pod_production.py).
-        # Downstream QA (Stage 6) and Etsy listing-draft creation (Stage 7) are still
-        # digital-file-shaped (expect a main file + ZIP) and haven't been adapted for
-        # a physical/Printify-fulfilled product yet -- that's the next real increment,
-        # built once a run actually gets past this stage with real catalog data to
-        # test against, rather than speculatively now.
+        # Falls through into the same QA/listing/authorization stages digital
+        # products use below -- QAAgent and UltronSupervisorAgent branch on
+        # product.product_type internally, and EtsyManagerAgent was already
+        # product-type-agnostic.
         t = _task(db, run, "production", "pod_production")
         t.started_at = datetime.now(timezone.utc)
         db.commit()
@@ -203,24 +202,15 @@ def run_digital_product_pipeline(db: Session, mission_id: int | None = None, nic
             return run
         _complete_task(
             db, t,
-            {
-                "printify_product_id": pod_result.printify_product_id,
-                "real_cost_usd": pod_result.real_cost_usd,
-                "note": "POD listing-draft creation not yet built -- real Printify product created, stopping here.",
-            },
-            status="blocked",
+            {"printify_product_id": pod_result.printify_product_id, "real_cost_usd": pod_result.real_cost_usd},
         )
-        run.completed_at = datetime.now(timezone.utc)
-        _touch(db, run, "production", "blocked_pod_listing_not_built")
-        _final_review(db, run)
-        return run
-
-    t = _task(db, run, "production", "digital_production")
-    t.started_at = datetime.now(timezone.utc)
-    db.commit()
-    production_agent = DigitalProductionAgent(db)
-    files = production_agent.produce(product, workflow_run_id=run.id)
-    _complete_task(db, t, {"files": [str(f) for f in files]})
+    else:
+        t = _task(db, run, "production", "digital_production")
+        t.started_at = datetime.now(timezone.utc)
+        db.commit()
+        production_agent = DigitalProductionAgent(db)
+        files = production_agent.produce(product, workflow_run_id=run.id)
+        _complete_task(db, t, {"files": [str(f) for f in files]})
 
     # --- Stage 6: quality assurance ---
     t = _task(db, run, "quality_assurance", "qa")

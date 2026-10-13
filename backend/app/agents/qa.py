@@ -33,6 +33,9 @@ class QAAgent(BaseAgent):
         return result
 
     def run_checks(self, product: ProductSpecification) -> bool:
+        if product.product_type != "digital":
+            return self._run_pod_checks(product)
+
         assets = self.db.query(ProductAsset).filter(ProductAsset.product_id == product.id).all()
         asset_by_type = {a.asset_type: Path(a.file_path) for a in assets}
         all_passed = True
@@ -130,6 +133,56 @@ class QAAgent(BaseAgent):
         self.log(
             "qa_completed",
             f"Product #{product.id} QA {'PASSED' if all_passed else 'FAILED'}",
+            {"product_id": product.id, "passed": all_passed},
+        )
+        return all_passed
+
+    def _run_pod_checks(self, product: ProductSpecification) -> bool:
+        """POD products have no PDF/XLSX/ZIP -- real checks instead verify
+        the real artwork file, the real Printify product, and that the real
+        quoted cost actually supports a positive margin at the listed price."""
+        all_passed = True
+        pod_data = (product.design_brief or {}).get("pod", {})
+
+        assets = self.db.query(ProductAsset).filter(ProductAsset.product_id == product.id).all()
+        artwork_path = next((Path(a.file_path) for a in assets if a.asset_type == "png"), None)
+        if artwork_path and artwork_path.exists():
+            try:
+                with Image.open(artwork_path) as img:
+                    passed = img.format == "PNG" and img.size[0] > 0 and img.size[1] > 0
+                    self._record(product.id, "pod_artwork_exists", passed, f"size={img.size}, format={img.format}")
+                    all_passed = all_passed and passed
+            except Exception as exc:  # noqa: BLE001
+                self._record(product.id, "pod_artwork_exists", False, f"Artwork image failed to open: {exc}")
+                all_passed = False
+        else:
+            self._record(product.id, "pod_artwork_exists", False, "Print artwork PNG missing.")
+            all_passed = False
+
+        printify_product_id = pod_data.get("printify_product_id")
+        passed = bool(printify_product_id)
+        self._record(
+            product.id, "printify_product_created", passed,
+            f"printify_product_id={printify_product_id}" if passed else "No Printify product id recorded.",
+        )
+        all_passed = all_passed and passed
+
+        real_cost = pod_data.get("real_cost_usd")
+        passed = isinstance(real_cost, (int, float)) and real_cost > 0 and product.recommended_price_usd > real_cost
+        detail = (
+            f"real_cost=${real_cost}, price=${product.recommended_price_usd}"
+            if real_cost is not None
+            else "No real cost recorded."
+        )
+        self._record(product.id, "real_cost_recorded", passed, detail)
+        all_passed = all_passed and passed
+
+        product.status = "qa_passed" if all_passed else "qa_failed"
+        self.db.commit()
+
+        self.log(
+            "qa_completed",
+            f"Product #{product.id} (POD) QA {'PASSED' if all_passed else 'FAILED'}",
             {"product_id": product.id, "passed": all_passed},
         )
         return all_passed

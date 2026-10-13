@@ -107,7 +107,10 @@ def create_draft_listing(
     is_digital: bool,
 ) -> EtsyListingResult:
     payload = {
-        "quantity": 999 if is_digital else 1,
+        # Neither digital files nor Printify POD (print-on-demand, no fixed
+        # inventory) have a real stock limit -- quantity is a high ceiling
+        # either way, not literally "1 unit in stock" for physical items.
+        "quantity": 999,
         "title": title[:140],
         "description": description,
         "price": round(price_usd, 2),
@@ -118,6 +121,9 @@ def create_draft_listing(
         "is_digital": is_digital,
         "state": "draft",
     }
+    if not is_digital:
+        # Etsy requires a shipping_profile_id for every physical listing.
+        payload["shipping_profile_id"] = settings.etsy_shipping_profile_id
 
     if not settings.etsy_configured or not access_token:
         return EtsyListingResult(
@@ -127,6 +133,20 @@ def create_draft_listing(
             detail=(
                 "Etsy integration not connected (missing API key/secret/shop_id or OAuth token). "
                 "Listing draft payload was constructed and validated locally but NOT sent to Etsy."
+            ),
+            request_payload=payload,
+        )
+    if not is_digital and not settings.etsy_shipping_profile_id:
+        return EtsyListingResult(
+            success=False,
+            simulated=True,
+            external_listing_id=None,
+            detail=(
+                "Cannot create a real physical listing: no ETSY_SHIPPING_PROFILE_ID configured. "
+                "Etsy requires a real shipping profile (cost/handling time) for every physical "
+                "listing -- that's a real shipping-cost decision, not something to guess. Create "
+                "one in Etsy's Shop Manager > Settings > Shipping settings, or ask to have one "
+                "created via the API with specific real rates."
             ),
             request_payload=payload,
         )

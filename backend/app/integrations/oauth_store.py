@@ -55,7 +55,17 @@ def get_valid_etsy_token(db: Session) -> str | None:
     if row is None:
         return None
 
-    if row.expires_at and datetime.now(timezone.utc) + REFRESH_MARGIN >= row.expires_at:
+    # SQLite drops tzinfo on round-trip even though expires_at is always
+    # written as UTC-aware (save_token above) -- normalize before comparing,
+    # or an aware `now` vs a naive `expires_at` raises TypeError. Confirmed
+    # live: this crashed the first time this path ran against a real stored
+    # token (no prior test exercised it, since tests never have a real
+    # stored OAuthToken row to hit this branch with).
+    expires_at = row.expires_at
+    if expires_at is not None and expires_at.tzinfo is None:
+        expires_at = expires_at.replace(tzinfo=timezone.utc)
+
+    if expires_at and datetime.now(timezone.utc) + REFRESH_MARGIN >= expires_at:
         if not row.refresh_token_encrypted:
             return None  # expired with no way to refresh; owner must reconnect
         try:

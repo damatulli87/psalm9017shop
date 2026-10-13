@@ -25,6 +25,7 @@ from dataclasses import dataclass, field
 from app.agents.base import BaseAgent
 from app.config import settings
 from app.integrations import printify
+from app.integrations.file_storage import product_dir, register_asset
 from app.integrations.image_providers import generate_print_artwork
 from app.models.models import ProductSpecification
 
@@ -139,6 +140,31 @@ class PODProductionAgent(BaseAgent):
             return PODProductionResult(False, blocked_reason=result.detail)
 
         real_cost = max(result.variant_costs_usd.values()) if result.variant_costs_usd else None
+
+        # Persist the real artwork as a real local asset (same pattern as
+        # digital products) so QA/Psalm 90:17's "assets present on disk"
+        # check applies uniformly, and so the actual print file is kept.
+        artwork_path = product_dir(product.id) / f"artwork_{product.id}.png"
+        artwork_path.write_bytes(artwork.png_bytes)
+        register_asset(self.db, product.id, "png", artwork_path)
+
+        # Real financial data: replace the $11 placeholder estimate from
+        # product_strategy.py with the real Printify-quoted cost now that
+        # it's known.
+        design_brief = dict(product.design_brief or {})
+        design_brief["pod"] = {
+            "printify_product_id": result.product_id,
+            "real_cost_usd": real_cost,
+            "mockup_image_url": result.mockup_image_urls[0] if result.mockup_image_urls else None,
+            "blueprint_id": catalog["blueprint_id"],
+            "print_provider_id": catalog["print_provider_id"],
+        }
+        product.design_brief = design_brief
+        if real_cost is not None:
+            product.estimated_cost_usd = real_cost
+            product.estimated_margin_usd = round(product.recommended_price_usd - real_cost, 2)
+        self.db.commit()
+
         self.log(
             "pod_product_created",
             f"Printify draft product #{result.product_id} created for product #{product.id} "

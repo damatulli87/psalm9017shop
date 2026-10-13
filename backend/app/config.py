@@ -58,6 +58,13 @@ class Settings(BaseSettings):
     etsy_api_secret: str | None = None
     etsy_shop_id: str | None = None
     etsy_oauth_redirect_uri: str = "http://localhost:8000/integrations/etsy/callback"
+    # Required by Etsy for any non-digital (physical) listing; there were
+    # zero shipping profiles on the real shop as of 2026-10-13 -- real
+    # shipping cost/handling-time is an owner business decision, not
+    # something to guess, so POD listing creation stays blocked until this
+    # is set to a real profile id (create one in Etsy's shop settings UI,
+    # or ask the assistant to create one via the API with real rates).
+    etsy_shipping_profile_id: str | None = None
     frontend_base_url: str = "http://localhost:3000"
 
     printify_api_token: str | None = None
