@@ -20,6 +20,7 @@ from sqlalchemy.orm import Session
 from app.agents.creative_director import CreativeDirectorAgent
 from app.agents.digital_production import DigitalProductionAgent
 from app.agents.etsy_manager import EtsyManagerAgent
+from app.agents.pod_production import PODProductionAgent
 from app.agents.financial_controller import FinancialControllerAgent  # noqa: F401  (used by routers)
 from app.agents.market_intelligence import MarketIntelligenceAgent
 from app.agents.opportunity_engine import OpportunityDecisionEngine
@@ -181,20 +182,42 @@ def run_digital_product_pipeline(db: Session, mission_id: int | None = None, nic
     brief = creative_agent.create_design_brief(product)
     _complete_task(db, t, {"design_brief": brief})
 
-    # --- Stage 5: production (digital only in this MVP; POD path awaits Printify/Printful wiring) ---
-    t = _task(db, run, "production", "digital_production")
-    t.started_at = datetime.now(timezone.utc)
-    db.commit()
+    # --- Stage 5: production ---
     if product.product_type != "digital":
+        # POD: real Printify catalog/cost/artwork call (app/agents/pod_production.py).
+        # Downstream QA (Stage 6) and Etsy listing-draft creation (Stage 7) are still
+        # digital-file-shaped (expect a main file + ZIP) and haven't been adapted for
+        # a physical/Printify-fulfilled product yet -- that's the next real increment,
+        # built once a run actually gets past this stage with real catalog data to
+        # test against, rather than speculatively now.
+        t = _task(db, run, "production", "pod_production")
+        t.started_at = datetime.now(timezone.utc)
+        db.commit()
+        pod_agent = PODProductionAgent(db)
+        pod_result = pod_agent.produce(product, workflow_run_id=run.id)
+        if not pod_result.success:
+            _complete_task(db, t, {"note": pod_result.blocked_reason}, status="blocked")
+            run.completed_at = datetime.now(timezone.utc)
+            _touch(db, run, "production", "blocked_pod", pod_result.blocked_reason or "POD production blocked.")
+            _final_review(db, run)
+            return run
         _complete_task(
             db, t,
-            {"note": "POD production not yet implemented in this build; selected opportunity requires POD."},
+            {
+                "printify_product_id": pod_result.printify_product_id,
+                "real_cost_usd": pod_result.real_cost_usd,
+                "note": "POD listing-draft creation not yet built -- real Printify product created, stopping here.",
+            },
             status="blocked",
         )
         run.completed_at = datetime.now(timezone.utc)
-        _touch(db, run, "production", "blocked_pod_not_implemented")
+        _touch(db, run, "production", "blocked_pod_listing_not_built")
         _final_review(db, run)
         return run
+
+    t = _task(db, run, "production", "digital_production")
+    t.started_at = datetime.now(timezone.utc)
+    db.commit()
     production_agent = DigitalProductionAgent(db)
     files = production_agent.produce(product, workflow_run_id=run.id)
     _complete_task(db, t, {"files": [str(f) for f in files]})

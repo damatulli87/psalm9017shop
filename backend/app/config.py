@@ -61,6 +61,7 @@ class Settings(BaseSettings):
     frontend_base_url: str = "http://localhost:3000"
 
     printify_api_token: str | None = None
+    printify_shop_id: str | None = None
     printful_api_token: str | None = None
 
     shopify_store_domain: str | None = None

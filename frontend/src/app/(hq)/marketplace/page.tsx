@@ -47,6 +47,7 @@ export default function MarketplacePage() {
   }
 
   const etsy = integrations.find((i) => i.provider === "etsy");
+  const printify = integrations.find((i) => i.provider === "printify");
 
   return (
     <div className="space-y-6">
@@ -112,9 +113,15 @@ export default function MarketplacePage() {
             Etsy&quot; button will appear here once those are set.
           </p>
         )}
+        {printify?.status === "awaiting_configuration" && (
+          <p className="text-xs text-[var(--text-dim)] mt-3">
+            To connect Printify: generate a token at printify.com/app/account/api, then set PRINTIFY_API_TOKEN
+            and PRINTIFY_SHOP_ID in backend/.env and restart the backend. Catalog/artwork/cost calls work once
+            configured; the real Etsy listing-draft step for POD products is still being built.
+          </p>
+        )}
         <p className="text-xs text-[var(--text-dim)] mt-2">
-          Printify, Printful, and Shopify adapters are not built yet (see PROGRESS.md) -- POD production is a
-          future phase.
+          Printful and Shopify adapters are not built yet (see PROGRESS.md).
         </p>
       </div>
 

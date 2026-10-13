@@ -52,43 +52,24 @@ def _upscale_to_preview_size(png_bytes: bytes) -> bytes:
     return buf.getvalue()
 
 
-def generate_listing_image(
-    db: Session,
-    *,
-    agent_key: str,
-    prompt: str,
-    title: str,
-    palette: dict,
-    workflow_run_id: int | None = None,
-) -> ImageResponse:
+def _generate_raw_image(db: Session, *, agent_key: str, prompt: str, workflow_run_id: int | None) -> bytes | None:
+    """Real gpt-image-1.5 call, native 1024x1024 PNG bytes. Returns None on
+    any failure (billing, rate limit, content policy) rather than raising --
+    callers fall back to their own placeholder."""
     if not settings.openai_configured:
-        buf = io.BytesIO()
-        _write_placeholder(buf, title=title, palette=palette)
-        return ImageResponse(buf.getvalue(), "mock", "placeholder-render", 0.0, True)
-
+        return None
     from openai import OpenAI
 
     client = OpenAI(api_key=settings.openai_api_key)
     try:
         resp = client.images.generate(
-            model=IMAGE_MODEL,
-            prompt=prompt,
-            size=GENERATED_SIZE,
-            quality=IMAGE_QUALITY,
-            n=1,
+            model=IMAGE_MODEL, prompt=prompt, size=GENERATED_SIZE, quality=IMAGE_QUALITY, n=1,
         )
         raw_bytes = base64.b64decode(resp.data[0].b64_json)
-        png_bytes = _upscale_to_preview_size(raw_bytes)
-        cost = PRICE_PER_IMAGE.get((IMAGE_MODEL, IMAGE_QUALITY), 0.04)
     except Exception:
-        # Real API call failed (billing, rate limit, content policy, etc.) --
-        # fall back to the placeholder rather than breaking production, but
-        # this is NOT silently swallowed: the caller gets is_mock=True and
-        # can log that the real call failed.
-        buf = io.BytesIO()
-        _write_placeholder(buf, title=title, palette=palette)
-        return ImageResponse(buf.getvalue(), "mock", "placeholder-render-fallback", 0.0, True)
+        return None
 
+    cost = PRICE_PER_IMAGE.get((IMAGE_MODEL, IMAGE_QUALITY), 0.04)
     record_expense(
         db,
         category="image_gen",
@@ -98,7 +79,48 @@ def generate_listing_image(
         workflow_run_id=workflow_run_id,
         agent_key=agent_key,
     )
+    return raw_bytes
+
+
+def generate_listing_image(
+    db: Session,
+    *,
+    agent_key: str,
+    prompt: str,
+    title: str,
+    palette: dict,
+    workflow_run_id: int | None = None,
+) -> ImageResponse:
+    """Etsy listing cover photo -- upscaled to the 2000x2000 QA/Etsy convention."""
+    raw_bytes = _generate_raw_image(db, agent_key=agent_key, prompt=prompt, workflow_run_id=workflow_run_id)
+    if raw_bytes is None:
+        buf = io.BytesIO()
+        _write_placeholder(buf, title=title, palette=palette)
+        return ImageResponse(buf.getvalue(), "mock", "placeholder-render", 0.0, True)
+    png_bytes = _upscale_to_preview_size(raw_bytes)
+    cost = PRICE_PER_IMAGE.get((IMAGE_MODEL, IMAGE_QUALITY), 0.04)
     return ImageResponse(png_bytes, "openai", IMAGE_MODEL, cost, False)
+
+
+def generate_print_artwork(
+    db: Session,
+    *,
+    agent_key: str,
+    prompt: str,
+    title: str,
+    palette: dict,
+    workflow_run_id: int | None = None,
+) -> ImageResponse:
+    """Print-ready POD artwork (t-shirt/mug design) -- kept at the API's
+    native 1024x1024, no upscale (Printify positions/scales it onto the real
+    print area itself via the placeholder x/y/scale params)."""
+    raw_bytes = _generate_raw_image(db, agent_key=agent_key, prompt=prompt, workflow_run_id=workflow_run_id)
+    if raw_bytes is None:
+        buf = io.BytesIO()
+        _write_placeholder(buf, title=title, palette=palette)
+        return ImageResponse(buf.getvalue(), "mock", "placeholder-render", 0.0, True)
+    cost = PRICE_PER_IMAGE.get((IMAGE_MODEL, IMAGE_QUALITY), 0.04)
+    return ImageResponse(raw_bytes, "openai", IMAGE_MODEL, cost, False)
 
 
 def _write_placeholder(buf: io.BytesIO, *, title: str, palette: dict) -> None:
