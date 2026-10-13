@@ -196,7 +196,7 @@ def run_digital_product_pipeline(db: Session, mission_id: int | None = None, nic
         _final_review(db, run)
         return run
     production_agent = DigitalProductionAgent(db)
-    files = production_agent.produce(product)
+    files = production_agent.produce(product, workflow_run_id=run.id)
     _complete_task(db, t, {"files": [str(f) for f in files]})
 
     # --- Stage 6: quality assurance ---
