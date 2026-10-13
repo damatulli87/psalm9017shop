@@ -62,7 +62,8 @@ from dataclasses import dataclass, field
 
 from app.agents.base import BaseAgent
 from app.config import settings
-from app.integrations import printify
+from app.integrations import ai_providers, oauth_store, printify
+from app.integrations.etsy import search_top_listings
 from app.integrations.file_storage import product_dir, register_asset
 from app.integrations.image_providers import generate_print_artwork
 from app.models.models import ProductSpecification
@@ -157,7 +158,51 @@ _PHYSICAL_OBJECT_NAMES = (
 )
 
 
-def _print_artwork_prompt(product: ProductSpecification) -> str:
+def _real_style_guidance(db, agent_key: str, product: ProductSpecification) -> str | None:
+    """Real competitive research: searches Etsy's actual live listings for
+    this niche, sorts by real num_favorers (favorites), and asks a real AI
+    call to extract common VISUAL/STYLE patterns across the top results --
+    never a specific design, and never material/fabrication claims (fine
+    jewelry results for "cross necklace" mention sterling silver, gold,
+    etc. that don't apply to a printed design and must not leak in).
+    Returns None (caller falls back to generic guidance) if Etsy isn't
+    connected, the search fails, or the AI call is mock/unparseable --
+    this is a real enhancement, not a hard requirement to produce art."""
+    token = oauth_store.get_valid_etsy_token(db)
+    if not settings.etsy_configured or not token:
+        return None
+    try:
+        top = search_top_listings(product.title, access_token=token, sample_size=50, top_n=10)
+    except Exception:  # noqa: BLE001
+        return None
+    if not top:
+        return None
+
+    listing_lines = "\n".join(f"- {t['title']} (tags: {', '.join(t['tags'][:6])})" for t in top)
+    resp = ai_providers.complete(
+        db,
+        agent_key=agent_key,
+        system_prompt=(
+            "You analyze real top-performing Etsy listings to extract common VISUAL/DESIGN style "
+            "patterns only. Never describe any single listing -- synthesize patterns across several. "
+            "Never mention specific materials, brands, or fabrication methods (e.g. sterling silver, "
+            "gold-filled) since those don't apply to a printed design. Respond with one short phrase "
+            "(max 30 words), no preamble."
+        ),
+        user_prompt=f"These are the most-favorited real Etsy listings for '{product.title}':\n{listing_lines}\n\n"
+                    f"In one short phrase, what visual/illustration style elements (shapes, motifs, "
+                    f"composition) do the best-performing ones have in common?",
+        task_hint="design_style_research",
+        complexity="routine",
+        workflow_run_id=None,
+    )
+    if resp.is_mock:
+        return None
+    text = resp.text.strip().strip('"')
+    return text[:300] if text else None
+
+
+def _print_artwork_prompt(product: ProductSpecification, style_guidance: str | None = None) -> str:
     """Standalone graphic design, not a lifestyle photo -- centered subject,
     no legible text (same garbled-text failure mode as listing photos, see
     image_providers.py / digital_production.py), transparent-friendly
@@ -169,27 +214,37 @@ def _print_artwork_prompt(product: ProductSpecification) -> str:
     category as the subject. Theme now comes from problem_solved/
     target_customer instead (never names the physical object), plus an
     explicit negative instruction not to depict any physical product at
-    all. Also asks for a style informed by what generally sells well in
-    the genre, not a specific copied design -- a cheap, real way to bias
-    toward "inspired by proven styles" without reproducing anyone's actual
-    artwork or needing real competitive-listing image data we don't have."""
+    all.
+
+    style_guidance, when available, comes from _real_style_guidance() --
+    REAL research on what's actually resonating in this niche right now
+    (owner's explicit ask: "we want to sell what is actually SELLING"),
+    not the model's generic guess at genre conventions. Falls back to a
+    generic instruction when real research isn't available (Etsy not
+    connected, search failed, mock AI mode)."""
+    style_instruction = (
+        f"Style it based on this real research on what's actually resonating with buyers in this "
+        f"niche right now: {style_guidance} Create an original piece inspired by these real patterns, "
+        f"never a copy of any specific existing design."
+        if style_guidance else
+        f"Style it the way a popular, well-selling design in this general genre typically looks -- "
+        f"but create an original piece only inspired by common successful visual conventions in the "
+        f"genre, never a copy of any specific existing design."
+    )
     return (
         f"A standalone decorative graphic design/motif meant to be printed "
         f"flat onto a physical item's surface (like clipart or a tattoo "
         f"stencil) -- NOT a picture of {_PHYSICAL_OBJECT_NAMES}. Design "
         f"theme: something that would resonate with this buyer: "
         f"{product.target_customer} The design should reflect this idea: "
-        f"{product.problem_solved} Style it the way a popular, well-selling "
-        f"design in this general genre typically looks -- bold simple "
-        f"shapes, flat illustration style suitable for screen printing -- "
-        f"but create an original piece only inspired by common successful "
-        f"visual conventions in the genre, never a copy of any specific "
-        f"existing design. The background MUST be solid flat pure white "
-        f"(#FFFFFF), edge to edge, with no gradient, vignette, shadow, "
-        f"texture, or color variation anywhere in the background -- only "
-        f"the design itself may have color. No legible text, letters, or "
-        f"words anywhere in the image, no logos or brand names, no "
-        f"depiction of the physical product it will be printed on."
+        f"{product.problem_solved} {style_instruction} Bold simple shapes, "
+        f"flat illustration style suitable for screen printing. The "
+        f"background MUST be solid flat pure white (#FFFFFF), edge to "
+        f"edge, with no gradient, vignette, shadow, texture, or color "
+        f"variation anywhere in the background -- only the design itself "
+        f"may have color. No legible text, letters, or words anywhere in "
+        f"the image, no logos or brand names, no depiction of the "
+        f"physical product it will be printed on."
     )
 
 
@@ -223,10 +278,18 @@ class PODProductionAgent(BaseAgent):
                 ),
             )
 
+        style_guidance = _real_style_guidance(self.db, self.key, product)
+        self.log(
+            "design_style_research",
+            f"Style guidance for product #{product.id}: "
+            f"{'real Etsy research -- ' + style_guidance if style_guidance else 'unavailable, using generic style instruction'}",
+            {"product_id": product.id, "real_research": bool(style_guidance)},
+        )
+
         artwork = generate_print_artwork(
             self.db,
             agent_key=self.key,
-            prompt=_print_artwork_prompt(product),
+            prompt=_print_artwork_prompt(product, style_guidance),
             title=product.title,
             palette=(product.design_brief or {}).get("palette", {
                 "primary": "#1B4332", "secondary": "#40916C", "accent": "#D8F3DC", "text": "#081C15",

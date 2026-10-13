@@ -146,7 +146,13 @@ class MarketIntelligenceAgent(BaseAgent):
                 "Etsy competitive/pricing data BLOCKED -- no Etsy API credentials configured. "
                 "Contributes 0 to differentiation/competition confidence until connected."
                 if not settings.etsy_configured
-                else "Etsy competitive data pending implementation of authenticated search calls."
+                # Real Etsy search (app/integrations/etsy.py:search_top_listings) exists now
+                # and is used for real design-style research in pod_production.py, but isn't
+                # wired into opportunity/competition SCORING here yet -- that's a real,
+                # separate feature (affects which niches get selected, not just the artwork
+                # of one already selected) that hasn't been asked for or built.
+                else "Etsy search is connected and used for real design-style research; "
+                     "not yet factored into this opportunity's competition score."
             )
 
             evidence = {

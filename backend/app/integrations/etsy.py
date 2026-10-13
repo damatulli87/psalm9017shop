@@ -203,3 +203,27 @@ def upload_listing_image(
         return True, "Listing image uploaded."
     except Exception as exc:  # noqa: BLE001
         return False, f"Etsy image upload failed: {exc}"
+
+
+def search_top_listings(keyword: str, *, access_token: str, sample_size: int = 50, top_n: int = 10) -> list[dict]:
+    """Real competitive research: searches Etsy's live active listings for
+    `keyword` and returns the top_n by real num_favorers within the sampled
+    batch. Etsy's search itself only sorts by relevance/price/date, not
+    popularity, so this pulls a real sample and sorts client-side -- that's
+    why a sample_size larger than top_n matters (confirmed live: the first
+    page by relevance had single-digit favorites; sorting a 50-result
+    sample surfaced one with 2,359). Titles/tags only -- never images, to
+    avoid any risk of reproducing another seller's actual artwork."""
+    resp = httpx.get(
+        f"{ETSY_API_BASE}/listings/active",
+        headers={"x-api-key": _api_key_header(), "Authorization": f"Bearer {access_token}"},
+        params={"keywords": keyword, "limit": sample_size, "sort_on": "score", "sort_order": "desc"},
+        timeout=15,
+    )
+    resp.raise_for_status()
+    results = resp.json().get("results", [])
+    results.sort(key=lambda r: r.get("num_favorers", 0), reverse=True)
+    return [
+        {"title": r.get("title", ""), "tags": r.get("tags", []), "num_favorers": r.get("num_favorers", 0)}
+        for r in results[:top_n]
+    ]
