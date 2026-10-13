@@ -45,7 +45,7 @@ finished, 26/26 production business.
 - [x] §6 Opportunity Decision Engine — configurable weights, can reject all
 - [x] §7 Product Strategy Agent
 - [x] §8 Creative Director Agent — design briefs only; no image-gen model wired (no image API key configured)
-- [x] §9 Digital Product Production — PDF + XLSX supported; DOCX/SVG not yet added (same pattern, not yet needed)
+- [x] §9 Digital Product Production — PDF + XLSX supported; DOCX/SVG not yet added (same pattern, not yet needed). **Content quality note**: most PDF niches still use a generic ruled-lines fallback template, which a real review correctly judged not worth selling. Chore charts got a real niche-specific layout (`generators/chore_chart_generator.py` -- actual day x task grid, checkboxes, reward tracker) because that was the niche the research kept selecting; other niches still need the same treatment before their products are genuinely sellable, not just technically valid files.
 - [ ] §10 POD Production — not started
 - [x] §11 QA Agent — digital checks done; POD checks n/a (no POD yet)
 - [x] §12 Etsy adapter — OAuth/PKCE + draft-listing call + `/integrations/etsy/connect` and `/callback` routes + encrypted token storage with auto-refresh, all built and tested (connect-without-credentials error path verified live). Runs simulated until the owner actually completes the consent flow with a real Etsy app; real-account verification still pending (no Etsy API credentials available in this build environment).
