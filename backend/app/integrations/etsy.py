@@ -27,6 +27,12 @@ ETSY_OAUTH_TOKEN_URL = "https://api.etsy.com/v3/public/oauth/token"
 ETSY_SCOPES = "listings_w listings_r shops_r transactions_r"
 
 
+def _api_key_header() -> str:
+    """This app's x-api-key must be 'keystring:shared_secret' -- confirmed
+    against the real Etsy API; the bare keystring alone is rejected."""
+    return f"{settings.etsy_api_key}:{settings.etsy_api_secret}"
+
+
 @dataclass
 class EtsyListingResult:
     success: bool
@@ -128,7 +134,7 @@ def create_draft_listing(
     try:
         resp = httpx.post(
             f"{ETSY_API_BASE}/shops/{settings.etsy_shop_id}/listings",
-            headers={"x-api-key": settings.etsy_api_key, "Authorization": f"Bearer {access_token}"},
+            headers={"x-api-key": _api_key_header(), "Authorization": f"Bearer {access_token}"},
             json=payload,
             timeout=15,
         )
