@@ -14,7 +14,7 @@ router = APIRouter(prefix="/missions", tags=["missions"])
 
 class RunPipelineRequest(BaseModel):
     title: str = "Run digital product discovery pipeline"
-    niche_limit: int = 5
+    niche_limit: int = 8
 
 
 @router.post("/run-digital-pipeline")

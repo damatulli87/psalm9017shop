@@ -34,7 +34,7 @@ def chat(body: ChatRequest, db: Session = Depends(get_db), user=Depends(get_curr
         db.add(mission)
         db.commit()
         db.refresh(mission)
-        run = run_digital_product_pipeline(db, mission_id=mission.id, niche_limit=5)
+        run = run_digital_product_pipeline(db, mission_id=mission.id, niche_limit=8)
         return {
             "reply": f"Ran the research-to-listing pipeline. Status: {run.status} (stage: {run.current_stage}). "
                      f"Workflow run #{run.id}.",

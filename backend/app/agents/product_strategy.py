@@ -20,13 +20,35 @@ DIGITAL_FORMAT_BY_NICHE = {
     "Prayer Journal Printable": ("pdf", 8.00),
     "Bible Study Planner": ("pdf", 9.00),
     "Sunday School Activity Worksheets": ("pdf", 5.00),
+    "Weekly Meal Planner Printable": ("pdf", 7.00),
+    "Habit Tracker Printable": ("pdf", 5.00),
+    "Workout Planner Printable": ("pdf", 7.00),
+    "Baby Shower Planning Printable": ("pdf", 6.00),
+    "Wedding Seating Chart Template": ("pdf", 12.00),
+    "Social Media Content Planner Printable": ("pdf", 8.00),
+    "Debt Payoff Tracker Printable": ("pdf", 6.00),
 }
+# Prices set with a real margin above verified Printify fulfillment cost
+# (see app/agents/pod_production.py catalog comments for the real cost each
+# product type returned) -- not arbitrary guesses.
 POD_FORMAT_BY_NICHE = {
     "Funny Cat-Lover T-Shirts": ("tshirt", 24.00),
     "Motivational Quote Mugs": ("mug", 16.00),
     "Teacher Appreciation POD Gifts": ("tshirt", 22.00),
     "Faith-Based Graphic T-Shirts": ("tshirt", 24.00),
     "Scripture Verse Coffee Mugs": ("mug", 16.00),
+    "Christian Faith Pullover Hoodies": ("hoodie", 54.00),
+    "Dog Mom Pullover Hoodies": ("hoodie", 54.00),
+    "Wedding Party Tote Bags": ("tote", 29.00),
+    "Teacher Appreciation Tote Bags": ("tote", 27.00),
+    "Motivational Quote Sticker Packs": ("sticker", 6.00),
+    "Christian Faith Sticker Packs": ("sticker", 6.00),
+    "Nurse Appreciation T-Shirts": ("tshirt", 24.00),
+    "Zodiac Sign Coffee Mugs": ("mug", 16.00),
+    "Christian Faith Baseball Caps": ("cap", 27.00),  # real cost $15.38
+    "Faith Cross Necklaces": ("necklace", 30.00),  # real cost $13.47
+    "Daily Gratitude Journal Notebooks": ("notebook", 23.00),  # real cost $15.63
+    "Motivational Quote Tumblers": ("tumbler", 35.00),  # real cost $24.97
 }
 
 _JSON_FENCE_RE = re.compile(r"^```(?:json)?\s*|\s*```$", re.MULTILINE)

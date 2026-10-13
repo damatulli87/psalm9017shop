@@ -118,7 +118,7 @@ def start_workflow(db: Session, workflow_type: str, mission_id: int | None = Non
     return run
 
 
-def run_digital_product_pipeline(db: Session, mission_id: int | None = None, niche_limit: int = 5) -> WorkflowRun:
+def run_digital_product_pipeline(db: Session, mission_id: int | None = None, niche_limit: int = 8) -> WorkflowRun:
     """
     Spec section 43's required first milestone: research -> select -> spec ->
     produce a REAL digital product -> validate -> Etsy-ready draft -> queue

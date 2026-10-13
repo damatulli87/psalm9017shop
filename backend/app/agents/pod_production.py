@@ -9,14 +9,46 @@ digital products -- Printify is used purely as a catalog/fulfillment
 backend here, not as the sales channel.
 
 NICHE_CATALOG_MAP entries are real, account-specific Printify catalog IDs,
-looked up live against the real catalog (2026-10-13) -- not guessed:
+looked up live against the real catalog (2026-10-13) -- not guessed, and
+each product type's real fulfillment cost was verified with an actual
+create_product() call before being priced in product_strategy.py:
   - T-shirt: blueprint 6 "Unisex Heavy Cotton Tee" (Gildan) x print
-    provider 99 "Printify Choice" (Printify's own reliability-balanced
-    default across its provider network). Variants: Black + White,
-    sizes S-2XL (10 variants).
+    provider 99 "Printify Choice". Black+White, S-2XL (10 variants).
+    Real cost: $9.68-$11.77.
   - Mug: blueprint 68 "Mug 11oz" x print provider 1 "SPOKE Custom
-    Products" (the only print provider for this blueprint). 1 variant
-    (11oz, no color/size options).
+    Products" (only provider for this blueprint). 1 variant. Real cost:
+    $6.44.
+  - Hoodie: blueprint 175 "Unisex Sponge Fleece Pullover Hoodie"
+    (Bella+Canvas) x print provider 99 "Printify Choice". Black+White,
+    S-2XL (10 variants). Real cost: $37.55-$40.84.
+  - Tote bag: blueprint 507 "Canvas Tote Bag, 5-Color Straps" x print
+    provider 99 "Printify Choice". Black+White, both sizes (4 variants).
+    Real cost: $18.74-$20.05.
+  - Stickers: blueprint 400 "Kiss-Cut Stickers" x print provider 99
+    "Printify Choice". All 4 sizes (2"/3"/4"/6"). Real cost: $1.42-$2.32.
+  - Cap: blueprint 1108 "Low Profile Baseball Cap" x print provider 99
+    "Printify Choice", DTF print at "front" (this blueprint also has
+    embroidery-only placeholders -- "front" specifically is the one
+    print-based area). 6 colors, one size. Real cost: $15.38.
+  - Necklace: blueprint 778 "Oval Necklace" x print provider 99
+    "Printify Choice", dye-sublimation. 1 variant (Silver, one size).
+    Confirmed this blueprint accepts a full-color image print (not
+    engraving-only, which would need very different artwork). Real
+    cost: $13.47.
+  - Notebook: blueprint 1931 "Hardcover Bound Notebook" x print
+    provider 99 "Printify Choice". Real placeholder position is
+    "front_uv" (uv-print), NOT "front" -- a plain "front" call failed
+    with a 422 until this was looked up from the real variants
+    response. 8 colors. Real cost: $15.63.
+  - Tumbler: blueprint 353 "Tumbler 20oz" x print provider 1 "SPOKE
+    Custom Products" (only provider), dye-sublimation. 1 variant. Real
+    cost: $24.97.
+"Printify Choice" was used for every type that offers it, for
+consistency -- it's Printify's own reliability-balanced default across
+its provider network, not a guess specific to one product. The real
+placeholder `position` name is looked up per blueprint+provider from
+its /variants.json response (`placeholders[].position`), not assumed to
+be "front" -- the notebook case above is exactly why.
 """
 from __future__ import annotations
 
@@ -41,13 +73,67 @@ _MUG_CATALOG = {
     "variant_ids": [33719],  # 11oz, only variant
     "print_position": "front",
 }
+_HOODIE_CATALOG = {
+    "blueprint_id": 175,
+    "print_provider_id": 99,
+    "variant_ids": [39826, 39844, 39862, 39880, 39898, 39838, 39856, 39874, 39892, 39910],  # Black/White, S-2XL
+    "print_position": "front",
+}
+_TOTE_CATALOG = {
+    "blueprint_id": 507,
+    "print_provider_id": 99,
+    "variant_ids": [80815, 80818, 80820, 80823],  # Black/White, 13x13 & 16x16
+    "print_position": "front",
+}
+_STICKER_CATALOG = {
+    "blueprint_id": 400,
+    "print_provider_id": 99,
+    "variant_ids": [45748, 45750, 45752, 45754],  # 2"/3"/4"/6"
+    "print_position": "front",
+}
+_CAP_CATALOG = {
+    "blueprint_id": 1108,
+    "print_provider_id": 99,
+    "variant_ids": [82433, 82434, 104278, 104279, 104280, 104282],  # 6 colors, one size
+    "print_position": "front",
+}
+_NECKLACE_CATALOG = {
+    "blueprint_id": 778,
+    "print_provider_id": 99,
+    "variant_ids": [74660],  # Silver, one size
+    "print_position": "front",
+}
+_NOTEBOOK_CATALOG = {
+    "blueprint_id": 1931,
+    "print_provider_id": 99,
+    "variant_ids": [119669, 119670, 119671, 119672, 119673, 119674, 119675, 119676],  # 8 colors
+    "print_position": "front_uv",
+}
+_TUMBLER_CATALOG = {
+    "blueprint_id": 353,
+    "print_provider_id": 1,
+    "variant_ids": [44519],  # 20oz, only variant
+    "print_position": "front",
+}
 
 NICHE_CATALOG_MAP: dict[str, dict] = {
     "Faith-Based Graphic T-Shirts": _TSHIRT_CATALOG,
     "Funny Cat-Lover T-Shirts": _TSHIRT_CATALOG,
     "Teacher Appreciation POD Gifts": _TSHIRT_CATALOG,
+    "Nurse Appreciation T-Shirts": _TSHIRT_CATALOG,
     "Scripture Verse Coffee Mugs": _MUG_CATALOG,
     "Motivational Quote Mugs": _MUG_CATALOG,
+    "Zodiac Sign Coffee Mugs": _MUG_CATALOG,
+    "Christian Faith Pullover Hoodies": _HOODIE_CATALOG,
+    "Dog Mom Pullover Hoodies": _HOODIE_CATALOG,
+    "Wedding Party Tote Bags": _TOTE_CATALOG,
+    "Teacher Appreciation Tote Bags": _TOTE_CATALOG,
+    "Motivational Quote Sticker Packs": _STICKER_CATALOG,
+    "Christian Faith Sticker Packs": _STICKER_CATALOG,
+    "Christian Faith Baseball Caps": _CAP_CATALOG,
+    "Faith Cross Necklaces": _NECKLACE_CATALOG,
+    "Daily Gratitude Journal Notebooks": _NOTEBOOK_CATALOG,
+    "Motivational Quote Tumblers": _TUMBLER_CATALOG,
 }
 
 

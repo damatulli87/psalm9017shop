@@ -56,7 +56,7 @@ def job_daily_market_research() -> None:
         from app.agents.market_intelligence import MarketIntelligenceAgent
         from app.agents.opportunity_engine import OpportunityDecisionEngine
 
-        opportunities = MarketIntelligenceAgent(db).research_candidates(limit=5)
+        opportunities = MarketIntelligenceAgent(db).research_candidates(limit=8)
         OpportunityDecisionEngine(db).select_best(opportunities)  # scores + logs; doesn't auto-produce
         _mark_run("daily_market_research", "success")
     except Exception as exc:  # noqa: BLE001
@@ -121,7 +121,7 @@ def job_weekly_opportunity_selection() -> None:
     db = SessionLocal()
     try:
         daily_count = db.query(Expense).count()  # placeholder guard; real daily-limit check lives in policy engine
-        run_digital_product_pipeline(db, niche_limit=5)
+        run_digital_product_pipeline(db, niche_limit=8)
         _mark_run("weekly_opportunity_selection", "success")
     except Exception as exc:  # noqa: BLE001
         _mark_run("weekly_opportunity_selection", f"error: {exc}")

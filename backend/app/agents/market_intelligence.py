@@ -28,25 +28,47 @@ TREND_CACHE_WINDOW = timedelta(hours=20)
 TREND_REQUEST_SPACING_SECONDS = 5.0
 
 CANDIDATE_NICHES = [
-    # Ordering matters: research_candidates() takes CANDIDATE_NICHES[:limit],
-    # and the default scheduled limit is 5 (see scheduler.py). Christian
-    # niches are interleaved into the first few slots so they get a real
-    # chance at being researched by default, not just on manual runs with a
-    # higher niche_limit -- without raising per-run Trends call volume.
+    # Ordering matters: research_candidates() takes CANDIDATE_NICHES[:limit]
+    # (scheduler default: 8, see scheduler.py). Deliberately broad and
+    # interleaved across digital/POD, faith/general, and product type so the
+    # first N slots -- the ones that actually get researched on a normal
+    # scheduled run, not just a manual run with a high niche_limit -- are a
+    # diverse real sample, not a narrow hand-picked set. The point of this
+    # list is coverage for real Trends scoring to find real demand, not a
+    # claim that any one of these is a good idea by itself.
     {"keyword": "printable chore chart", "category": "digital", "niche_title": "Printable Chore Charts"},
+    {"keyword": "weekly meal planner printable", "category": "digital", "niche_title": "Weekly Meal Planner Printable"},
     {"keyword": "bible verse wall art printable", "category": "digital", "niche_title": "Bible Verse Printable Wall Art"},
+    {"keyword": "dog mom hoodie", "category": "pod", "niche_title": "Dog Mom Pullover Hoodies"},
     {"keyword": "budget planner printable", "category": "digital", "niche_title": "Printable Budget Planners"},
+    {"keyword": "motivational sticker pack", "category": "pod", "niche_title": "Motivational Quote Sticker Packs"},
+    {"keyword": "habit tracker printable", "category": "digital", "niche_title": "Habit Tracker Printable"},
+    {"keyword": "nurse appreciation t shirt", "category": "pod", "niche_title": "Nurse Appreciation T-Shirts"},
     {"keyword": "prayer journal printable", "category": "digital", "niche_title": "Prayer Journal Printable"},
+    {"keyword": "zodiac mug", "category": "pod", "niche_title": "Zodiac Sign Coffee Mugs"},
+    {"keyword": "motivational tumbler", "category": "pod", "niche_title": "Motivational Quote Tumblers"},
     {"keyword": "wedding planning template", "category": "digital", "niche_title": "Wedding Planning Templates"},
+    {"keyword": "christian hoodie", "category": "pod", "niche_title": "Christian Faith Pullover Hoodies"},
+    {"keyword": "cross necklace", "category": "pod", "niche_title": "Faith Cross Necklaces"},
     {"keyword": "bible study planner printable", "category": "digital", "niche_title": "Bible Study Planner"},
+    {"keyword": "gratitude journal notebook", "category": "pod", "niche_title": "Daily Gratitude Journal Notebooks"},
+    {"keyword": "wedding tote bag", "category": "pod", "niche_title": "Wedding Party Tote Bags"},
+    {"keyword": "christian baseball cap", "category": "pod", "niche_title": "Christian Faith Baseball Caps"},
+    {"keyword": "workout planner printable", "category": "digital", "niche_title": "Workout Planner Printable"},
     {"keyword": "small business invoice template", "category": "digital", "niche_title": "Small Business Invoice Templates"},
     {"keyword": "bible verse coffee mug", "category": "pod", "niche_title": "Scripture Verse Coffee Mugs"},
-    {"keyword": "printable daily planner", "category": "digital", "niche_title": "Printable Daily Planners"},
+    {"keyword": "baby shower planning printable", "category": "digital", "niche_title": "Baby Shower Planning Printable"},
     {"keyword": "christian faith t shirt", "category": "pod", "niche_title": "Faith-Based Graphic T-Shirts"},
+    {"keyword": "printable daily planner", "category": "digital", "niche_title": "Printable Daily Planners"},
+    {"keyword": "christian sticker pack", "category": "pod", "niche_title": "Christian Faith Sticker Packs"},
     {"keyword": "digital journal template", "category": "digital", "niche_title": "Digital Journal Templates"},
+    {"keyword": "wedding seating chart template", "category": "digital", "niche_title": "Wedding Seating Chart Template"},
     {"keyword": "sunday school worksheets printable", "category": "digital", "niche_title": "Sunday School Activity Worksheets"},
+    {"keyword": "teacher appreciation tote bag", "category": "pod", "niche_title": "Teacher Appreciation Tote Bags"},
     {"keyword": "funny cat t shirt", "category": "pod", "niche_title": "Funny Cat-Lover T-Shirts"},
+    {"keyword": "social media content planner printable", "category": "digital", "niche_title": "Social Media Content Planner Printable"},
     {"keyword": "motivational quote mug", "category": "pod", "niche_title": "Motivational Quote Mugs"},
+    {"keyword": "debt payoff tracker printable", "category": "digital", "niche_title": "Debt Payoff Tracker Printable"},
     {"keyword": "teacher appreciation gift", "category": "pod", "niche_title": "Teacher Appreciation POD Gifts"},
     {"keyword": "home office productivity planner", "category": "digital", "niche_title": "Home Office Productivity Planners"},
 ]
