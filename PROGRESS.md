@@ -14,10 +14,10 @@ Last updated: 2026-10-12, end of first build session.
 | 6 | Research results include verifiable evidence | ✅ | Google Trends call verified real (`is_real_data=True`, actual interest score returned) |
 | 7 | Niche selection works autonomously | ✅ | `OpportunityDecisionEngine` scored and selected without human input; can also reject all (tested logically, not yet observed in a real run since trends data cleared the bar) |
 | 8 | Digital products generated as usable files | ✅ | Verified: real 5-page 612×792pt PDF opens via `pypdf`, real PNG 2000×2000, real ZIP validated |
-| 9 | POD artwork generated and validated | ⚠️ Partial | Real AI artwork generation (`gpt-image-1.5`) and Printify product/cost adapter built (`app/integrations/printify.py`, `app/agents/pod_production.py`); blocked on a real `PRINTIFY_API_TOKEN` + a verified catalog mapping (blueprint/print_provider/variant IDs) for each POD niche, which must come from a real catalog lookup, not a guess |
+| 9 | POD artwork generated and validated | ⚠️ Partial | Verified end-to-end against the real Printify API: real AI artwork generated (`gpt-image-1.5`), uploaded, a real draft product created, real per-variant cost ($11.77 max across a Black/White S-2XL tee) and real mockup image URL returned, then cleaned up. Real catalog mapping filled in for all 5 POD niches in the research list. Still missing: QA checks and Etsy listing-draft creation are digital-file-shaped and haven't been adapted for a physical/Printify product yet, so a POD opportunity still can't reach a real listing end to end. |
 | 10 | Quality checks enforced | ✅ | All 5 QA checks ran and passed on a real product; a failing product would be blocked from `qa_passed` status (verified by code path, not yet observed on a real failure) |
 | 11 | Marketplace listing drafts can be created | ✅ | Verified: Etsy draft payload built, validated, stored as `MarketplaceListing` |
-| 12 | Supported marketplace APIs work with valid credentials | ✅ Etsy / ⚠️ Printify | Etsy: fully connected and verified against the real API (real OAuth token stored, decrypts, and a real authenticated call against the live shop returned 200). Printify: adapter built and documents the real v1 API shapes, not yet exercised against a real account (no token configured). Shopify: not built. |
+| 12 | Supported marketplace APIs work with valid credentials | ✅ Etsy / ✅ Printify | Etsy: fully connected and verified (real OAuth token, real authenticated call returned 200). Printify: fully connected and verified (real token, real shop list, real catalog browse, real product-creation/cost/mockup round trip). Shopify: not built. |
 | 13 | Authorized publication workflows function | ✅ | Verified via live API: approval → `resume_after_approval()` → listing status `published_simulated` |
 | 14 | Orders can be retrieved | ❌ | Not built (no connected storefront) |
 | 15 | Fulfillment workflows operate within policy | ❌ | Not built (no POD integration) |
@@ -46,7 +46,7 @@ finished, 26/26 production business.
 - [x] §7 Product Strategy Agent
 - [x] §8 Creative Director Agent — design briefs only; no image-gen model wired (no image API key configured)
 - [x] §9 Digital Product Production — PDF + XLSX supported; DOCX/SVG not yet added (same pattern, not yet needed). **Content quality note**: most PDF niches still use a generic ruled-lines fallback template, which a real review correctly judged not worth selling. Chore charts got a real niche-specific layout (`generators/chore_chart_generator.py` -- actual day x task grid, checkboxes, reward tracker) because that was the niche the research kept selecting; other niches still need the same treatment before their products are genuinely sellable, not just technically valid files.
-- [~] §10 POD Production — real artwork-gen + Printify catalog/cost adapter built; blocked on a real PRINTIFY_API_TOKEN + verified catalog IDs per niche; downstream QA/Etsy-listing-draft steps still assume a digital file and haven't been adapted for a physical/Printify-fulfilled product yet
+- [~] §10 POD Production — real artwork-gen + Printify catalog/cost/mockup round trip verified end-to-end against the real account for all 5 POD niches in the research list; downstream QA/Etsy-listing-draft steps still assume a digital file and haven't been adapted for a physical/Printify-fulfilled product yet
 - [x] §11 QA Agent — digital checks done; POD checks n/a (no POD yet)
 - [x] §12 Etsy adapter — OAuth/PKCE + draft-listing call + `/integrations/etsy/connect` and `/callback` routes + encrypted token storage with auto-refresh. Fully connected and verified against the real Etsy API (real shop "Psalm9017Shop", real stored access token, real authenticated call returned 200).
 - [ ] §13 Shopify — not started (correctly, per spec: don't auto-activate)
@@ -64,7 +64,7 @@ finished, 26/26 production business.
 - [~] §25 Full Command Center — 11 screens built (added Psalm 90:17 Oversight); interactive React-Flow-style graph not built (a custom illustrated "Factory Floor" pipeline view instead); WebSocket live push not built (polling instead)
 - [x] §26 Tech stack — FastAPI/SQLAlchemy/Next.js/Tailwind as specified; LangGraph swapped for a custom durable engine (documented); Redis/Docker not used yet
 - [x] §27 Database architecture — all 30 entities, migrated, constrained
-- [~] §28 Integration architecture — Trends + Etsy adapters real and connected; Printify adapter real but not yet connected to a real account; Printful/Shopify/storage/email not built
+- [~] §28 Integration architecture — Trends + Etsy + Printify adapters real and connected; Printful/Shopify/storage/email not built
 - [~] §29 Security — see SECURITY.md for the full implemented/missing split
 - [x] §30 Real-time ops — polling-based (5s), not WebSocket/SSE push yet
 - [ ] §31 Notifications — not implemented
