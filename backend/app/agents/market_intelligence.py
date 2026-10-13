@@ -12,10 +12,20 @@ category examples) -- not a claim of market insight by itself. All actual
 """
 from __future__ import annotations
 
+import time
+from datetime import datetime, timedelta, timezone
+
 from app.agents.base import BaseAgent
 from app.config import settings
-from app.integrations.trends import fetch_trend_signal
+from app.integrations.trends import TrendSignal, fetch_trend_signal
 from app.models.models import MarketOpportunity, ResearchSource
+
+# Google Trends rate-limits (HTTP 429) under repeated same-session calls --
+# confirmed in practice, not theoretical. Two real mitigations: reuse a
+# recent REAL result instead of re-fetching (cache), and space out calls
+# that do need a fresh fetch so we don't burst the limiter.
+TREND_CACHE_WINDOW = timedelta(hours=20)
+TREND_REQUEST_SPACING_SECONDS = 5.0
 
 CANDIDATE_NICHES = [
     # Ordering matters: research_candidates() takes CANDIDATE_NICHES[:limit],
@@ -45,27 +55,70 @@ CANDIDATE_NICHES = [
 class MarketIntelligenceAgent(BaseAgent):
     key = "market_intelligence"
 
+    def _get_cached_trend(self, keyword: str) -> ResearchSource | None:
+        """A recent REAL Trends result for this exact keyword, if one exists
+        within the cache window -- reused instead of a fresh network call.
+        Never caches a failed/unavailable result, since that would just
+        replay the rate-limit error instead of retrying it."""
+        cutoff = datetime.now(timezone.utc) - TREND_CACHE_WINDOW
+        return (
+            self.db.query(ResearchSource)
+            .filter(
+                ResearchSource.name == f"Google Trends: {keyword}",
+                ResearchSource.source_type == "google_trends",
+                ResearchSource.is_real_data.is_(True),
+                ResearchSource.retrieved_at >= cutoff,
+            )
+            .order_by(ResearchSource.retrieved_at.desc())
+            .first()
+        )
+
     def research_candidates(self, workflow_run_id: int | None = None, limit: int = 5) -> list[MarketOpportunity]:
         opportunities: list[MarketOpportunity] = []
+        made_a_real_call = False
 
         for candidate in CANDIDATE_NICHES[:limit]:
-            signal = fetch_trend_signal(candidate["keyword"])
+            cached = self._get_cached_trend(candidate["keyword"])
+            if cached:
+                raw = cached.raw_data
+                signal = TrendSignal(
+                    keyword=candidate["keyword"],
+                    is_real_data=True,
+                    average_interest=raw.get("average_interest"),
+                    trend_direction=raw.get("trend_direction"),
+                    error=None,
+                )
+                source = ResearchSource(
+                    name=cached.name,
+                    source_type="google_trends_cached",
+                    is_real_data=True,
+                    url=cached.url,
+                    raw_data={**raw, "cached_from_source_id": cached.id, "cached_from_retrieved_at": cached.retrieved_at.isoformat()},
+                )
+                self.db.add(source)
+                self.db.commit()
+                self.db.refresh(source)
+            else:
+                if made_a_real_call:
+                    time.sleep(TREND_REQUEST_SPACING_SECONDS)
+                signal = fetch_trend_signal(candidate["keyword"])
+                made_a_real_call = True
 
-            source = ResearchSource(
-                name=f"Google Trends: {candidate['keyword']}",
-                source_type="google_trends" if signal.is_real_data else "google_trends_unavailable",
-                is_real_data=signal.is_real_data,
-                url=f"https://trends.google.com/trends/explore?q={candidate['keyword'].replace(' ', '%20')}",
-                raw_data={
-                    "average_interest": signal.average_interest,
-                    "trend_direction": signal.trend_direction,
-                    "series_points": len(signal.raw_series),
-                    "error": signal.error,
-                },
-            )
-            self.db.add(source)
-            self.db.commit()
-            self.db.refresh(source)
+                source = ResearchSource(
+                    name=f"Google Trends: {candidate['keyword']}",
+                    source_type="google_trends" if signal.is_real_data else "google_trends_unavailable",
+                    is_real_data=signal.is_real_data,
+                    url=f"https://trends.google.com/trends/explore?q={candidate['keyword'].replace(' ', '%20')}",
+                    raw_data={
+                        "average_interest": signal.average_interest,
+                        "trend_direction": signal.trend_direction,
+                        "series_points": len(signal.raw_series),
+                        "error": signal.error,
+                    },
+                )
+                self.db.add(source)
+                self.db.commit()
+                self.db.refresh(source)
 
             etsy_note = (
                 "Etsy competitive/pricing data BLOCKED -- no Etsy API credentials configured. "
