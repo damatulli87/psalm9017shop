@@ -8,14 +8,15 @@ through app/integrations/etsy.py and the same owner-approval gate as
 digital products -- Printify is used purely as a catalog/fulfillment
 backend here, not as the sales channel.
 
-NICHE_CATALOG_MAP is intentionally empty. Each entry is real,
-account-specific Printify catalog data (a blueprint_id + print_provider_id
-+ variant_ids combination that actually exists and prints the intended
-physical product) -- not something safe to guess or hardcode ahead of a
-real catalog lookup. Until a niche has a verified entry here, production
-for it stays blocked with an honest reason rather than silently using a
-wrong or made-up catalog ID. Fill this in via scripts/printify_catalog.py
-(or an equivalent one-off lookup) once PRINTIFY_API_TOKEN is configured.
+NICHE_CATALOG_MAP entries are real, account-specific Printify catalog IDs,
+looked up live against the real catalog (2026-10-13) -- not guessed:
+  - T-shirt: blueprint 6 "Unisex Heavy Cotton Tee" (Gildan) x print
+    provider 99 "Printify Choice" (Printify's own reliability-balanced
+    default across its provider network). Variants: Black + White,
+    sizes S-2XL (10 variants).
+  - Mug: blueprint 68 "Mug 11oz" x print provider 1 "SPOKE Custom
+    Products" (the only print provider for this blueprint). 1 variant
+    (11oz, no color/size options).
 """
 from __future__ import annotations
 
@@ -27,10 +28,25 @@ from app.integrations import printify
 from app.integrations.image_providers import generate_print_artwork
 from app.models.models import ProductSpecification
 
+_TSHIRT_CATALOG = {
+    "blueprint_id": 6,
+    "print_provider_id": 99,
+    "variant_ids": [12100, 12101, 12102, 12103, 12104, 12124, 12125, 12126, 12127, 12128],  # White/Black, S-2XL
+    "print_position": "front",
+}
+_MUG_CATALOG = {
+    "blueprint_id": 68,
+    "print_provider_id": 1,
+    "variant_ids": [33719],  # 11oz, only variant
+    "print_position": "front",
+}
+
 NICHE_CATALOG_MAP: dict[str, dict] = {
-    # "Faith-Based Graphic T-Shirts": {
-    #     "blueprint_id": 0, "print_provider_id": 0, "variant_ids": [0], "print_position": "front",
-    # },
+    "Faith-Based Graphic T-Shirts": _TSHIRT_CATALOG,
+    "Funny Cat-Lover T-Shirts": _TSHIRT_CATALOG,
+    "Teacher Appreciation POD Gifts": _TSHIRT_CATALOG,
+    "Scripture Verse Coffee Mugs": _MUG_CATALOG,
+    "Motivational Quote Mugs": _MUG_CATALOG,
 }
 
 

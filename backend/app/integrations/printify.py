@@ -143,10 +143,17 @@ def create_product(
             success=False, product_id=None, detail=f"Printify API error {resp.status_code}: {resp.text[:500]}",
         )
     data = resp.json()
+    # Printify's response includes cost data for the WHOLE blueprint's variant
+    # catalog, not just the ones we actually selected (confirmed live: a
+    # 10-variant request came back with 400+ costed variants, including sizes
+    # we don't offer) -- filter to only the variants we actually requested,
+    # or a real cost downstream (e.g. a max()) would reflect a size we never
+    # offered rather than the real cost of what we're actually selling.
+    requested = set(variant_ids)
     variant_costs = {
         str(v["id"]): round(v.get("cost", 0) / 100, 2)
         for v in data.get("variants", [])
-        if "cost" in v
+        if "cost" in v and v["id"] in requested
     }
     mockups = [img["src"] for img in data.get("images", []) if img.get("src")]
     return PrintifyProductResult(
@@ -157,3 +164,10 @@ def create_product(
         detail="Draft product created on Printify (not published) -- real per-variant cost returned.",
         raw=data,
     )
+
+
+def delete_product(shop_id: str, product_id: str) -> bool:
+    """For cleaning up a draft product that was only created to pull real
+    cost/mockup data and was rejected before ever being listed."""
+    resp = httpx.delete(f"{PRINTIFY_API_BASE}/shops/{shop_id}/products/{product_id}.json", headers=_headers(), timeout=15)
+    return resp.status_code < 300
