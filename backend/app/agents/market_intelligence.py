@@ -16,10 +16,12 @@ from __future__ import annotations
 import time
 from datetime import datetime, timedelta, timezone
 
+import statistics
+
 from app.agents.base import BaseAgent
 from app.config import settings
 from app.integrations import oauth_store
-from app.integrations.etsy import get_active_listing_count
+from app.integrations.etsy import get_active_listing_count, search_top_listings
 from app.integrations.trends import TrendSignal, fetch_trend_signal
 from app.models.models import MarketOpportunity, ResearchSource
 
@@ -36,6 +38,37 @@ TREND_REQUEST_SPACING_SECONDS = 5.0
 # keyword across runs in a short window; listing-count saturation doesn't
 # meaningfully change hour to hour.
 ETSY_COMPETITION_CACHE_WINDOW = timedelta(hours=20)
+MARKET_SIGNAL_CACHE_WINDOW = timedelta(hours=20)
+
+# Real "proven winner" signal (owner's explicit direction, 2026-10-14: "we
+# need to be looking at what is selling... chase what design and product
+# is selling the most and piggy back off of that" -- NOT raw listing
+# count/saturation, which was the wrong lever). Etsy's real API has no
+# sales/units-sold field for listings we don't own (confirmed against the
+# real v3 schema), so real favorites (num_favorers) is the closest real
+# proxy for "buyers are responding to this specific thing" available.
+# top1_favorites / median_favorites of the real top-N sample measures
+# whether there's a clear real standout (proof something specific is
+# working disproportionately well) vs. a flat, undifferentiated field
+# (nothing specific to learn from). Higher concentration = MORE useful
+# signal here, the opposite of how this same ratio would read as a
+# saturation/entrenchment risk -- deliberately not built that way; a
+# flat field isn't evidence of nothing selling, just evidence of nothing
+# single thing to confidently learn from and build toward yet.
+_STANDOUT_THRESHOLDS = [
+    (2.0, 0.40),   # no real standout -- flat field, weak "what to copy" signal
+    (5.0, 0.60),   # mild standout
+    (15.0, 0.85),  # clear standout -- real evidence of a specific proven approach
+]
+_STANDOUT_EXTREME_SCORE = 0.70  # ratio > 15: real, but a single outlier is less reliable than a clear-but-moderate lead
+
+
+def _standout_score_from_ratio(ratio: float) -> float:
+    for ceiling, score in _STANDOUT_THRESHOLDS:
+        if ratio < ceiling:
+            return score
+    return _STANDOUT_EXTREME_SCORE
+
 
 CANDIDATE_NICHES = [
     # Ordering matters: research_candidates() takes CANDIDATE_NICHES[:limit]
@@ -143,6 +176,64 @@ class MarketIntelligenceAgent(BaseAgent):
         self.db.commit()
         return count, True
 
+    def _get_market_signal(self, keyword: str) -> tuple[dict | None, bool]:
+        """Real 'what's actually winning' signal (owner directive, see the
+        module-level comment above _STANDOUT_THRESHOLDS): fetches the real
+        top-favorited Etsy listings for this keyword and checks whether
+        there's a real standout -- concrete evidence of a specific
+        approach outperforming, which is what gets built toward, not
+        avoided. Returns (signal_dict, is_real); signal_dict includes the
+        real top listing titles/tags as auditable evidence, not just a
+        derived number. Cached first; never caches a failure."""
+        cutoff = datetime.now(timezone.utc) - MARKET_SIGNAL_CACHE_WINDOW
+        cached = (
+            self.db.query(ResearchSource)
+            .filter(
+                ResearchSource.name == f"Market signal: {keyword}",
+                ResearchSource.source_type == "etsy_market_signal",
+                ResearchSource.is_real_data.is_(True),
+                ResearchSource.retrieved_at >= cutoff,
+            )
+            .order_by(ResearchSource.retrieved_at.desc())
+            .first()
+        )
+        if cached:
+            return cached.raw_data, True
+
+        token = oauth_store.get_valid_etsy_token(self.db)
+        if not settings.etsy_configured or not token:
+            return None, False
+        try:
+            top = search_top_listings(keyword, access_token=token, sample_size=50, top_n=15)
+        except Exception:  # noqa: BLE001
+            return None, False
+        if not top:
+            return None, False
+
+        favorites = [t["num_favorers"] for t in top]
+        median_fav = statistics.median(favorites)
+        standout_ratio = favorites[0] / max(median_fav, 1)
+        signal = {
+            "standout_ratio": round(standout_ratio, 2),
+            "standout_score": _standout_score_from_ratio(standout_ratio),
+            "top_listing_title": top[0]["title"],
+            "top_listing_tags": top[0]["tags"][:8],
+            "top_listing_favorites": favorites[0],
+            "median_favorites": median_fav,
+            "sample_size": len(top),
+        }
+
+        source = ResearchSource(
+            name=f"Market signal: {keyword}",
+            source_type="etsy_market_signal",
+            is_real_data=True,
+            url=f"https://www.etsy.com/search?q={keyword.replace(' ', '%20')}",
+            raw_data=signal,
+        )
+        self.db.add(source)
+        self.db.commit()
+        return signal, True
+
     def research_candidates(self, workflow_run_id: int | None = None, limit: int = 5) -> list[MarketOpportunity]:
         opportunities: list[MarketOpportunity] = []
         made_a_real_call = False
@@ -200,6 +291,8 @@ class MarketIntelligenceAgent(BaseAgent):
                 else "Real Etsy competition search failed for this keyword this run."
             )
 
+            market_signal, market_signal_real = self._get_market_signal(candidate["keyword"])
+
             evidence = {
                 "trend_source_id": source.id,
                 "is_real_data": signal.is_real_data,
@@ -209,6 +302,14 @@ class MarketIntelligenceAgent(BaseAgent):
                 "etsy_competition_data": etsy_note,
                 "etsy_listing_count": listing_count,
                 "etsy_competition_is_real": etsy_real,
+                # Real "what's actually winning" evidence (not saturation/
+                # listing-count) -- see _get_market_signal(). Feeds
+                # opportunity_engine.py's differentiation_score AND is
+                # passed straight into product_strategy.py's AI prompt so
+                # target_customer/problem_solved get grounded in the real
+                # top performer, not a generic assumption about the niche.
+                "market_signal": market_signal,
+                "market_signal_is_real": market_signal_real,
             }
 
             opp = MarketOpportunity(

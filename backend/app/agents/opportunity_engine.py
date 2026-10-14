@@ -14,10 +14,20 @@ from app.models.models import MarketOpportunity, OperatingPolicy, OpportunitySco
 
 DEFAULT_WEIGHTS = {
     "demand_evidence": 0.25,
-    "competitive_opportunity": 0.20,
+    # Lowered from 0.20 (2026-10-14, owner directive): raw listing-count
+    # saturation matters less than proof of what's actually resonating --
+    # "I don't care if 9 million chore charts are being listed if they
+    # don't sell." Kept as a real signal, just no longer weighted as if
+    # it were the primary one.
+    "competitive_opportunity": 0.10,
     "estimated_profitability": 0.25,
     "production_feasibility": 0.15,
-    "differentiation_potential": 0.10,
+    # Raised from 0.10 (2026-10-14): this is now a real "proven winner"
+    # signal (see score_opportunity()'s differentiation_score), not a flat
+    # 0.50 placeholder -- it's the direct operationalization of "chase
+    # what design and product is selling the most and piggy back off of
+    # that," so it carries real weight now.
+    "differentiation_potential": 0.20,
     "risk": 0.05,
 }
 
@@ -98,11 +108,21 @@ class OpportunityDecisionEngine(BaseAgent):
             feasibility_score = 0.60
             risk_score = 0.65
 
-        # Real competitive search exists now (app/integrations/etsy.py:search_top_listings,
-        # used for design-style research), but isn't wired into this specific dimension yet --
-        # e.g. favorites-concentration across top results as a differentiation proxy. Left as
-        # a neutral placeholder rather than building an under-verified scoring heuristic.
-        differentiation_score = 0.50
+        # --- Differentiation: real "what's actually winning" signal (owner directive,
+        # 2026-10-14: "we need to be looking at what is selling... chase what design
+        # and product is selling the most and piggy back off of that" -- NOT raw
+        # listing-count saturation, which was the wrong lever and got explicitly
+        # rejected). market_intelligence.py's _get_market_signal() fetches the real
+        # top-favorited Etsy listings for this keyword; a real standout (one listing
+        # pulling disproportionate favorites vs. the sample median) is evidence a
+        # specific approach is proven to resonate, which is what should be chased --
+        # the opposite of how this same ratio would read as a saturation risk.
+        market_signal = evidence.get("market_signal")
+        if evidence.get("market_signal_is_real") and market_signal:
+            differentiation_score = market_signal["standout_score"]
+        else:
+            differentiation_score = 0.40  # neutral/unknown, deliberately not optimistic
+            confidence = "low"
 
         weighted_total = (
             demand_score * weights.get("demand_evidence", DEFAULT_WEIGHTS["demand_evidence"])
@@ -118,11 +138,21 @@ class OpportunityDecisionEngine(BaseAgent):
         if confidence == "low" and weighted_total < minimum + 0.1:
             decision = "needs_more_research" if decision == "selected" else decision
 
+        if evidence.get("market_signal_is_real") and market_signal:
+            signal_note = (
+                f"real standout found (top real listing '{market_signal['top_listing_title'][:60]}' has "
+                f"{market_signal['top_listing_favorites']} favorites vs. a {market_signal['median_favorites']:.0f} "
+                f"median across the top {market_signal['sample_size']}, ratio {market_signal['standout_ratio']}x)"
+            )
+        else:
+            signal_note = "no real market-signal data available this run"
+
         rationale = (
             f"Weighted score {weighted_total:.2f} vs minimum {minimum:.2f}. "
             f"Demand evidence {'REAL (Google Trends)' if evidence.get('is_real_data') else 'UNAVAILABLE'}"
             f"(score {demand_score:.2f}). Competitive data (score {competition_score:.2f}): "
             f"{evidence.get('etsy_competition_data', 'n/a')}. "
+            f"Differentiation/proven-winner signal (score {differentiation_score:.2f}): {signal_note}. "
             f"Category defaults applied for profitability/feasibility/risk ({opportunity.category})."
         )
 

@@ -110,6 +110,30 @@ class ProductStrategyAgent(BaseAgent):
 
         margin = round(price - est_cost, 2)
 
+        # Real "what's actually winning" signal (owner directive, 2026-10-14:
+        # "chase what design and product is selling the most and piggy back
+        # off of that" -- not a generic assumption about the niche name).
+        # market_intelligence.py already fetched the real top-favorited
+        # Etsy listing for this keyword; ground the target_customer/
+        # problem_solved in THAT real angle when it reveals something more
+        # specific than the niche title suggests, instead of free-
+        # associating about the niche in the abstract.
+        market_signal = (opportunity.evidence_summary or {}).get("market_signal")
+        if market_signal and (opportunity.evidence_summary or {}).get("market_signal_is_real"):
+            signal_instruction = (
+                f"\n\nReal evidence of what's actually winning in this niche right now: the real "
+                f"top-favorited Etsy listing is titled '{market_signal['top_listing_title']}' "
+                f"(tags: {', '.join(market_signal['top_listing_tags'])}), with {market_signal['top_listing_favorites']} "
+                f"real favorites vs. a {market_signal['median_favorites']:.0f} median among the top "
+                f"{market_signal['sample_size']} results -- a real standout, not a guess. If this reveals a more "
+                f"specific or different real buyer/angle than the niche name alone suggests (e.g. a different age "
+                f"group, a specific use case, an adjacent audience), ground target_customer/problem_solved in that "
+                f"REAL proven angle instead of a generic assumption about the niche. Never copy this listing's exact "
+                f"title/wording -- synthesize the real audience/angle it reveals, in your own words."
+            )
+        else:
+            signal_instruction = ""
+
         ai_resp = ai_providers.complete(
             self.db,
             agent_key=self.key,
@@ -119,7 +143,8 @@ class ProductStrategyAgent(BaseAgent):
                 f"1. A specific target customer description -- who exactly buys this (1-2 sentences, concrete, "
                 f"not generic).\n"
                 f"2. A specific problem/benefit statement -- what real problem this solves for them (1 sentence). "
-                f"Avoid vague filler like 'addresses needs within the niche.'\n\n"
+                f"Avoid vague filler like 'addresses needs within the niche.'"
+                f"{signal_instruction}\n\n"
                 f"Evidence: {json.dumps(opportunity.evidence_summary)}\n\n"
                 f'Respond with ONLY valid JSON, no markdown fences: '
                 f'{{"target_customer": "...", "problem_solved": "..."}}'

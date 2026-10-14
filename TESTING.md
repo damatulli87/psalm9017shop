@@ -206,6 +206,40 @@ built for a short banner was reused for a full-page cover without
 adjusting its text positioning), and decorative confetti dots initially
 scattered across the title text before an exclusion zone was added.
 
+**Strategic reframe: saturation scoring rejected, "what's selling" signal
+built instead (2026-10-14).** Mid-session, after real market-saturation
+data for chore charts was already being chased as a scoring fix, the
+owner redirected: "why are we looking at saturation? we need to be
+looking at what is selling... chase what design and product is selling
+the most and piggy back off of that." `backend/tests/test_market_signal.py`
+covers the real replacement:
+- `test_standout_score_rewards_a_clear_real_standout` /
+  `_extreme_outlier_scores_slightly_lower` -- confirms the real scoring
+  curve treats a clear real standout (proof something specific is
+  working) as a GOOD signal to chase, the opposite of how the same ratio
+  would read as a saturation/entrenchment risk.
+- `test_get_market_signal_computes_real_standout_from_live_shaped_data` --
+  monkeypatches `search_top_listings()` to the exact real response shape
+  captured live for "Printable Chore Charts" (220 favorites vs. a 23
+  median, 9.57x) and confirms the real computation matches what was
+  actually observed.
+- `test_opportunity_scoring_uses_real_market_signal_not_flat_placeholder`
+  -- the real bug this replaces: `differentiation_score` used to be a
+  flat 0.50 for every opportunity regardless of real conditions; two
+  different real market signals must now produce two different real
+  scores.
+- `test_differentiation_potential_weight_raised_above_competitive_opportunity`
+  -- confirms the real rebalanced weights (0.20 vs. 0.10) per the owner's
+  stated priority, and that they still sum to 1.0.
+
+Last verified run: all 6 passed. Verified live end-to-end beyond the unit
+tests too: a real `product_strategy.py` call, given the real chore-chart
+market signal (the real top-favorited listing turned out to be an
+"ADHD Cleaning Checklist, Room by Room Family Organizer," not a generic
+kids' chart), produced "Parents and caregivers of children with ADHD or
+executive function challenges..." as the real target_customer -- correctly
+grounded in the real evidence rather than a generic niche-name assumption.
+
 ## What's NOT built yet
 
 - Unit tests for individual agents/generators in isolation (today they're

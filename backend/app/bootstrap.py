@@ -187,12 +187,15 @@ AGENT_ROSTER = [
 
 DEFAULT_POLICIES = {
     "autonomy_mode": settings.autonomy_mode,
+    # 2026-10-14, owner directive: chase real proof of what's selling, not
+    # raw listing-count saturation -- see opportunity_engine.py's
+    # DEFAULT_WEIGHTS for the full rationale. Kept in sync with that file.
     "scoring_weights": {
         "demand_evidence": 0.25,
-        "competitive_opportunity": 0.20,
+        "competitive_opportunity": 0.10,
         "estimated_profitability": 0.25,
         "production_feasibility": 0.15,
-        "differentiation_potential": 0.10,
+        "differentiation_potential": 0.20,
         "risk": 0.05,
     },
     "minimum_opportunity_score": 0.55,
