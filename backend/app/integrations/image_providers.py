@@ -111,9 +111,13 @@ def generate_print_artwork(
     palette: dict,
     workflow_run_id: int | None = None,
 ) -> ImageResponse:
-    """Print-ready POD artwork (t-shirt/mug design) -- kept at the API's
-    native 1024x1024, no upscale (Printify positions/scales it onto the real
-    print area itself via the placeholder x/y/scale params)."""
+    """Print-ready POD artwork (t-shirt/mug design) at the API's native
+    1024x1024. Caller (pod_production.py) is responsible for resizing to
+    the real target print dimensions via resize_to_print_dimensions() --
+    confirmed live that without this, our source was significantly
+    undersized and aspect-mismatched for most physical products (e.g. a
+    t-shirt print area is really 3951x4919, a tote 2102x4051), not
+    something Printify transparently handles well for us."""
     raw_bytes = _generate_raw_image(db, agent_key=agent_key, prompt=prompt, workflow_run_id=workflow_run_id)
     if raw_bytes is None:
         buf = io.BytesIO()
@@ -121,6 +125,29 @@ def generate_print_artwork(
         return ImageResponse(buf.getvalue(), "mock", "placeholder-render", 0.0, True)
     cost = PRICE_PER_IMAGE.get((IMAGE_MODEL, IMAGE_QUALITY), 0.04)
     return ImageResponse(raw_bytes, "openai", IMAGE_MODEL, cost, False)
+
+
+def resize_to_print_dimensions(png_bytes: bytes, target_size: tuple[int, int]) -> bytes:
+    """Resizes real generated artwork to the exact real print-area pixel
+    dimensions Printify's catalog reports for a given blueprint+position
+    (see print_size entries in pod_production.py's catalog dicts, pulled
+    live from each blueprint's /variants.json placeholders). High-quality
+    Lanczos resampling, scaled to FIT WITHIN the target (never cropping
+    any of the design) and centered on a pure white canvas at the exact
+    target size -- seamless since the artwork prompt always requests a
+    pure white background already. Works for both upscaling (e.g. 1024px
+    source into a 3951x4919 t-shirt print area) and downscaling (e.g. into
+    a 319x425 necklace pendant), not just one direction."""
+    img = Image.open(io.BytesIO(png_bytes)).convert("RGB")
+    target_w, target_h = target_size
+    scale = min(target_w / img.width, target_h / img.height)
+    new_w, new_h = max(1, round(img.width * scale)), max(1, round(img.height * scale))
+    resized = img.resize((new_w, new_h), Image.LANCZOS)
+    canvas = Image.new("RGB", (target_w, target_h), (255, 255, 255))
+    canvas.paste(resized, ((target_w - new_w) // 2, (target_h - new_h) // 2))
+    buf = io.BytesIO()
+    canvas.save(buf, "PNG")
+    return buf.getvalue()
 
 
 def _write_placeholder(buf: io.BytesIO, *, title: str, palette: dict) -> None:

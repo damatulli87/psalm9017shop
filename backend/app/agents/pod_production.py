@@ -65,7 +65,7 @@ from app.config import settings
 from app.integrations import ai_providers, oauth_store, printify
 from app.integrations.etsy import search_top_listings
 from app.integrations.file_storage import product_dir, register_asset
-from app.integrations.image_providers import generate_print_artwork
+from app.integrations.image_providers import generate_print_artwork, resize_to_print_dimensions
 from app.models.models import ProductSpecification
 
 _TSHIRT_CATALOG = {
@@ -73,54 +73,63 @@ _TSHIRT_CATALOG = {
     "print_provider_id": 99,
     "variant_ids": [12100, 12101, 12102, 12103, 12104, 12124, 12125, 12126, 12127, 12128],  # White/Black, S-2XL
     "print_position": "front",
+    "print_size": (3951, 4919),  # real, from the blueprint's own variants.json placeholders
 }
 _MUG_CATALOG = {
     "blueprint_id": 68,
     "print_provider_id": 1,
     "variant_ids": [33719],  # 11oz, only variant
     "print_position": "front",
+    "print_size": (2700, 1120),
 }
 _HOODIE_CATALOG = {
     "blueprint_id": 175,
     "print_provider_id": 99,
     "variant_ids": [39826, 39844, 39862, 39880, 39898, 39838, 39856, 39874, 39892, 39910],  # Black/White, S-2XL
     "print_position": "front",
+    "print_size": (2945, 1961),
 }
 _TOTE_CATALOG = {
     "blueprint_id": 507,
     "print_provider_id": 99,
     "variant_ids": [80815, 80818, 80820, 80823],  # Black/White, 13x13 & 16x16
     "print_position": "front",
+    "print_size": (2102, 4051),
 }
 _STICKER_CATALOG = {
     "blueprint_id": 400,
     "print_provider_id": 99,
     "variant_ids": [45748, 45750, 45752, 45754],  # 2"/3"/4"/6"
     "print_position": "front",
+    "print_size": (559, 559),
 }
 _CAP_CATALOG = {
     "blueprint_id": 1108,
     "print_provider_id": 99,
     "variant_ids": [82433, 82434, 104278, 104279, 104280, 104282],  # 6 colors, one size
     "print_position": "front",
+    "print_size": (1500, 600),
 }
 _NECKLACE_CATALOG = {
     "blueprint_id": 778,
     "print_provider_id": 99,
     "variant_ids": [74660],  # Silver, one size
     "print_position": "front",
+    "print_size": (319, 425),
 }
 _NOTEBOOK_CATALOG = {
     "blueprint_id": 1931,
     "print_provider_id": 99,
     "variant_ids": [119669, 119670, 119671, 119672, 119673, 119674, 119675, 119676],  # 8 colors
     "print_position": "front_uv",
+    "print_size": (900, 1500),
 }
 _TUMBLER_CATALOG = {
     "blueprint_id": 353,
     "print_provider_id": 1,
     "variant_ids": [44519],  # 20oz, only variant
     "print_position": "front",
+    "print_size": (2795, 2100),
 }
 
 NICHE_CATALOG_MAP: dict[str, dict] = {
@@ -222,14 +231,26 @@ def _print_artwork_prompt(product: ProductSpecification, style_guidance: str | N
     not the model's generic guess at genre conventions. Falls back to a
     generic instruction when real research isn't available (Etsy not
     connected, search failed, mock AI mode)."""
+    # Real style guidance drives the ACTUAL visual complexity/style -- if
+    # real top sellers in a niche use detailed, textured, painterly, or
+    # photorealistic art, the design should too. A hardcoded "bold simple
+    # shapes, flat illustration" bias used to be appended unconditionally
+    # here regardless of style_guidance, which silently overrode real
+    # research toward simple/flat every time -- caught by the owner before
+    # it shipped ("we arent going to be building rinky dink stuff"). The
+    # flat/simple fallback now only applies when there's no real data to
+    # go on at all.
     style_instruction = (
         f"Style it based on this real research on what's actually resonating with buyers in this "
-        f"niche right now: {style_guidance} Create an original piece inspired by these real patterns, "
-        f"never a copy of any specific existing design."
+        f"niche right now: {style_guidance} Match the actual level of visual detail/complexity "
+        f"real top-selling designs in this niche have -- simple if that's what's proven to work, "
+        f"detailed/textured/painterly if that's what's proven to work. Create an original piece "
+        f"inspired by these real patterns, never a copy of any specific existing design."
         if style_guidance else
         f"Style it the way a popular, well-selling design in this general genre typically looks -- "
-        f"but create an original piece only inspired by common successful visual conventions in the "
-        f"genre, never a copy of any specific existing design."
+        f"bold simple shapes, flat illustration style suitable for screen printing -- but create an "
+        f"original piece only inspired by common successful visual conventions in the genre, never a "
+        f"copy of any specific existing design."
     )
     return (
         f"A standalone decorative graphic design/motif meant to be printed "
@@ -237,13 +258,11 @@ def _print_artwork_prompt(product: ProductSpecification, style_guidance: str | N
         f"stencil) -- NOT a picture of {_PHYSICAL_OBJECT_NAMES}. Design "
         f"theme: something that would resonate with this buyer: "
         f"{product.target_customer} The design should reflect this idea: "
-        f"{product.problem_solved} {style_instruction} Bold simple shapes, "
-        f"flat illustration style suitable for screen printing. The "
-        f"background MUST be solid flat pure white (#FFFFFF), edge to "
-        f"edge, with no gradient, vignette, shadow, texture, or color "
-        f"variation anywhere in the background -- only the design itself "
-        f"may have color. No legible text, letters, or words anywhere in "
-        f"the image, no logos or brand names, no depiction of the "
+        f"{product.problem_solved} {style_instruction} The background MUST "
+        f"be solid flat pure white (#FFFFFF), edge to edge, with no "
+        f"gradient, vignette, shadow, or color variation anywhere OUTSIDE "
+        f"the design itself. No legible text, letters, or words anywhere "
+        f"in the image, no logos or brand names, no depiction of the "
         f"physical product it will be printed on."
     )
 
@@ -303,7 +322,13 @@ class PODProductionAgent(BaseAgent):
                                "refusing to submit a placeholder design as real print artwork.",
             )
 
-        upload = printify.upload_image(f"product_{product.id}_artwork.png", image_bytes=artwork.png_bytes)
+        # Real resize to this product's actual real print-area pixel dimensions
+        # (catalog["print_size"], pulled live from Printify's own catalog) --
+        # confirmed live that the raw 1024x1024 source was significantly
+        # undersized/aspect-mismatched for most physical products otherwise.
+        print_ready_bytes = resize_to_print_dimensions(artwork.png_bytes, catalog["print_size"])
+
+        upload = printify.upload_image(f"product_{product.id}_artwork.png", image_bytes=print_ready_bytes)
         image_id = upload.get("id")
         if not image_id:
             return PODProductionResult(False, blocked_reason=f"Printify image upload did not return an id: {upload}")
@@ -324,11 +349,12 @@ class PODProductionAgent(BaseAgent):
 
         real_cost = max(result.variant_costs_usd.values()) if result.variant_costs_usd else None
 
-        # Persist the real artwork as a real local asset (same pattern as
-        # digital products) so QA/Psalm 90:17's "assets present on disk"
-        # check applies uniformly, and so the actual print file is kept.
+        # Persist the real PRINT-READY artwork (not the raw 1024x1024 source)
+        # as a real local asset (same pattern as digital products) so QA/
+        # Psalm 90:17's "assets present on disk" check applies uniformly,
+        # and so the actual file sent to print is what's kept and inspectable.
         artwork_path = product_dir(product.id) / f"artwork_{product.id}.png"
-        artwork_path.write_bytes(artwork.png_bytes)
+        artwork_path.write_bytes(print_ready_bytes)
         register_asset(self.db, product.id, "png", artwork_path)
 
         # Real financial data: replace the $11 placeholder estimate from
