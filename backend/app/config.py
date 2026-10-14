@@ -79,6 +79,13 @@ class Settings(BaseSettings):
     printify_shop_id: str | None = None
     printful_api_token: str | None = None
 
+    # Real AI super-resolution upscaling (Replicate-hosted Real-ESRGAN) for
+    # POD print artwork -- optional quality enhancement on top of the
+    # Lanczos resize in image_providers.py, not required for production to
+    # work. Confirmed live with a real side-by-side comparison: visibly
+    # crisper edges than plain Lanczos interpolation on the same source.
+    replicate_api_token: str | None = None
+
     shopify_store_domain: str | None = None
     shopify_admin_api_token: str | None = None
 

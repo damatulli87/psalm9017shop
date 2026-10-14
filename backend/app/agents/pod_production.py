@@ -65,7 +65,7 @@ from app.config import settings
 from app.integrations import ai_providers, oauth_store, printify
 from app.integrations.etsy import search_top_listings
 from app.integrations.file_storage import product_dir, register_asset
-from app.integrations.image_providers import generate_print_artwork, resize_to_print_dimensions
+from app.integrations.image_providers import ai_upscale, generate_print_artwork, resize_to_print_dimensions
 from app.models.models import ProductSpecification
 
 _TSHIRT_CATALOG = {
@@ -322,11 +322,20 @@ class PODProductionAgent(BaseAgent):
                                "refusing to submit a placeholder design as real print artwork.",
             )
 
+        # Real AI super-resolution first when the target print area actually
+        # needs upscaling (skip entirely for necklace/sticker, where the
+        # real target is smaller than our 1024x1024 source -- no benefit,
+        # just wasted real cost). Falls back to the original bytes
+        # unchanged if Replicate isn't configured or the call fails.
+        source_bytes = artwork.png_bytes
+        if max(catalog["print_size"]) > 1024:
+            source_bytes = ai_upscale(self.db, agent_key=self.key, png_bytes=source_bytes, workflow_run_id=workflow_run_id)
+
         # Real resize to this product's actual real print-area pixel dimensions
         # (catalog["print_size"], pulled live from Printify's own catalog) --
         # confirmed live that the raw 1024x1024 source was significantly
         # undersized/aspect-mismatched for most physical products otherwise.
-        print_ready_bytes = resize_to_print_dimensions(artwork.png_bytes, catalog["print_size"])
+        print_ready_bytes = resize_to_print_dimensions(source_bytes, catalog["print_size"])
 
         upload = printify.upload_image(f"product_{product.id}_artwork.png", image_bytes=print_ready_bytes)
         image_id = upload.get("id")
