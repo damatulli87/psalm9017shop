@@ -62,12 +62,14 @@ def test_table_headers_never_overlap_into_the_next_column(tmp_path: Path):
     # Real geometric check: every rendered header label must fit within its
     # own column width, using the same stringWidth the renderer itself uses.
     from reportlab.pdfgen import canvas as _canvas
-    from app.agents.generators.pdf_generator import CONTENT_LEFT, CONTENT_RIGHT, _fit_text
+    from app.agents.generators.design_system import FONT_BOLD, register_fonts
+    from app.agents.generators.pdf_generator import CARD_LEFT, CARD_PAD, CARD_RIGHT, _fit_text
+    register_fonts()
     c = _canvas.Canvas(str(tmp_path / "scratch.pdf"))
-    col_w = (CONTENT_RIGHT - CONTENT_LEFT) / 6
+    col_w = ((CARD_RIGHT - CARD_PAD) - (CARD_LEFT + CARD_PAD)) / 6
     for col in plan[0]["columns"]:
-        fitted = _fit_text(c, col.upper(), col_w - 0.16 * 72, font_name="Helvetica-Bold", font_size=7.5)
-        assert c.stringWidth(fitted, "Helvetica-Bold", 7.5) <= col_w - 0.16 * 72
+        fitted = _fit_text(c, col.upper(), col_w - 0.16 * 72, font_name=FONT_BOLD, font_size=7.5)
+        assert c.stringWidth(fitted, FONT_BOLD, 7.5) <= col_w - 0.16 * 72
 
 
 def test_content_plan_validator_accepts_a_real_shaped_plan():

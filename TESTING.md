@@ -172,6 +172,40 @@ mode would be caught automatically on the next run.
 
 Last verified run: all 7 passed (5 + 2). Full suite: 34/34.
 
+**Visual design overhaul (2026-10-14):** the owner compared a real
+pipeline-generated listing to real top-selling competitors mid-session
+("how can we charge when ours is plain jane") and asked for a mockup
+before committing to a full rebuild -- a real sample page (real embedded
+font, real AI-generated icons, decorative header, rounded card) was
+generated and shown before any of the generators were touched, and two
+scoping questions (icons on generic non-chore-chart pages? style
+direction?) were explicitly answered before building further.
+`backend/tests/test_design_system.py` covers the new shared
+`generators/design_system.py` module:
+- Confirms the real committed font files exist, are SIL OFL licensed
+  (free to embed in a sold product), and actually register/render in
+  ReportLab (real glyph widths reported, not just "didn't raise").
+- Confirms all 9 real AI-generated default-task icon assets exist on disk
+  and that an unknown task name returns `None` (a plain color badge)
+  rather than erroring.
+- Confirms the real niche-aware palette selection
+  (`creative_director._digital_palette_for()`) matches real keywords
+  (chore→playful, wedding→elegant, budget→professional, bible→faith,
+  anything else→default) and that `CreativeDirectorAgent` really wires
+  the themed palette through end-to-end (a real DB write, not just the
+  pure selection function) -- closing a real pre-existing gap where
+  every digital product got the identical dark-green palette regardless
+  of niche.
+
+Last verified run: all 7 passed. Verified live and visually across all 4
+real palette themes by actually rendering a sample page per theme and
+looking at it (not just generating it) -- caught and fixed two real
+layout bugs this way: the chore-chart cover page's three text lines
+initially overlapped into an illegible stack (a header-drawing function
+built for a short banner was reused for a full-page cover without
+adjusting its text positioning), and decorative confetti dots initially
+scattered across the title text before an exclusion zone was added.
+
 ## What's NOT built yet
 
 - Unit tests for individual agents/generators in isolation (today they're
