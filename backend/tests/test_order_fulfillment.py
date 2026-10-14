@@ -58,7 +58,10 @@ def _make_listing(db, *, product_type: str, title: str, external_listing_id: str
     return product, listing
 
 
-def _fake_receipt(receipt_id: str, listing_id: str, *, quantity: int = 1) -> dict:
+def _fake_receipt(receipt_id: str, listing_id: str, *, quantity: int = 1, product_id: int | None = None) -> dict:
+    txn = {"listing_id": listing_id, "quantity": quantity}
+    if product_id is not None:
+        txn["product_id"] = product_id
     return {
         "receipt_id": receipt_id,
         "name": "Jane Buyer",
@@ -70,7 +73,7 @@ def _fake_receipt(receipt_id: str, listing_id: str, *, quantity: int = 1) -> dic
         "country_iso": "US",
         "buyer_email": "jane@example.com",
         "grandtotal": {"amount": 1999, "divisor": 100},
-        "transactions": [{"listing_id": listing_id, "quantity": quantity}],
+        "transactions": [txn],
     }
 
 
@@ -245,6 +248,104 @@ def test_pod_order_submits_to_printify_only_after_owner_approves(monkeypatch):
 
         event = db.query(FulfillmentEvent).filter(FulfillmentEvent.order_id == order.id).order_by(FulfillmentEvent.id.desc()).first()
         assert event is not None and event.status == "submitted" and event.tracking_info == "fake-printify-order-1"
+    finally:
+        _teardown(db, order=order, product=product, listing=listing)
+
+
+def test_pod_order_ships_the_real_purchased_variant_when_mapped(monkeypatch):
+    """Real fix for the size/color gap: a buyer who picked Black/S must
+    get Black/S, not the catalog's arbitrarily-first-listed White/L --
+    this is exactly what etsy_manager.py's real variant_map (built from
+    Etsy's own inventory response) exists to prevent."""
+    db = SessionLocal()
+    order = product = listing = None
+    try:
+        product, listing = _make_listing(
+            db, product_type="pod", title="Faith-Based Graphic T-Shirts - test",
+            external_listing_id="9001007",
+            design_brief={
+                "pod": {
+                    "printify_product_id": "fake-printify-product-id-4",
+                    "variant_map": {"555000111": 12126},  # Black / S, not the catalog's first (12100, White/L)
+                },
+            },
+        )
+
+        calls = {}
+
+        def _fake_submit_order(shop_id, *, external_id, product_id, variant_id, quantity, address_to):
+            calls["variant_id"] = variant_id
+            return PrintifyOrderResult(success=True, order_id="fake-printify-order-2", detail="ok")
+
+        monkeypatch.setattr(of.printify, "submit_order", _fake_submit_order)
+        monkeypatch.setattr(of.settings, "printify_shop_id", "fake-shop-id")
+
+        agent = of.OrderFulfillmentAgent(db)
+        order = Order(storefront_channel="etsy", external_order_id="pod-4", order_total_usd=19.99, status="received")
+        db.add(order)
+        db.commit()
+        db.refresh(order)
+
+        agent._fulfill(order, _fake_receipt("pod-4", listing.external_listing_id, product_id=555000111))
+
+        approval = db.query(Approval).filter(Approval.action_type == "pod_paid_production_order").order_by(Approval.id.desc()).first()
+        decide_approval(db, approval.id, approve=True, decided_by="owner-test")
+        resume_after_approval(db, approval.id)
+
+        assert calls.get("variant_id") == 12126, "must ship the real purchased variant, not the catalog default"
+        concerns = db.query(Approval).filter(Approval.action_type == "operational_concern").all()
+        assert not any("wasn't found" in (c.summary or "") for c in concerns), "a correctly-mapped purchase shouldn't raise a mismatch concern"
+    finally:
+        _teardown(db, order=order, product=product, listing=listing)
+
+
+def test_pod_order_falls_back_and_flags_concern_when_product_id_unmapped(monkeypatch):
+    """A real variant_map exists for this listing, but the buyer's real
+    product_id isn't in it (e.g. Etsy data drift, or a mapping built
+    before a listing's inventory was last changed) -- must still ship
+    something (the catalog default) rather than fail the order outright,
+    but must surface the mismatch rather than silently guessing right."""
+    db = SessionLocal()
+    order = product = listing = None
+    try:
+        product, listing = _make_listing(
+            db, product_type="pod", title="Faith-Based Graphic T-Shirts - test",
+            external_listing_id="9001008",
+            design_brief={
+                "pod": {
+                    "printify_product_id": "fake-printify-product-id-5",
+                    "variant_map": {"111222333": 12126},
+                },
+            },
+        )
+
+        calls = {}
+
+        def _fake_submit_order(shop_id, *, external_id, product_id, variant_id, quantity, address_to):
+            calls["variant_id"] = variant_id
+            return PrintifyOrderResult(success=True, order_id="fake-printify-order-3", detail="ok")
+
+        monkeypatch.setattr(of.printify, "submit_order", _fake_submit_order)
+        monkeypatch.setattr(of.settings, "printify_shop_id", "fake-shop-id")
+
+        agent = of.OrderFulfillmentAgent(db)
+        order = Order(storefront_channel="etsy", external_order_id="pod-5", order_total_usd=19.99, status="received")
+        db.add(order)
+        db.commit()
+        db.refresh(order)
+
+        agent._fulfill(order, _fake_receipt("pod-5", listing.external_listing_id, product_id=999999999))
+
+        approval = db.query(Approval).filter(Approval.action_type == "pod_paid_production_order").order_by(Approval.id.desc()).first()
+        decide_approval(db, approval.id, approve=True, decided_by="owner-test")
+        resume_after_approval(db, approval.id)
+
+        catalog_default = 12100  # first variant_id in _TSHIRT_CATALOG
+        assert calls.get("variant_id") == catalog_default
+
+        concern = db.query(Approval).filter(Approval.action_type == "operational_concern").order_by(Approval.id.desc()).first()
+        assert concern is not None and "wasn't found" in concern.summary
+        assert concern.payload.get("etsy_product_id") == 999999999
     finally:
         _teardown(db, order=order, product=product, listing=listing)
 

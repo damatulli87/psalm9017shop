@@ -293,10 +293,15 @@ def list_recent_paid_receipts(*, access_token: str, limit: int = 25) -> list[dic
     receipt's real schema (confirmed live, 2026-10-14) includes shipping
     address fields (name/first_line/second_line/city/state/zip/country_iso),
     buyer_email, and a `transactions` array with listing_id/is_digital/
-    quantity/variations per line item -- everything order_fulfillment.py
+    quantity/product_id per line item -- everything order_fulfillment.py
     needs to tell a real digital sale (Etsy handles delivery itself once
     the file is attached, see etsy_manager.py) from a real POD sale
-    (needs a real Printify order submitted)."""
+    (needs a real Printify order submitted). `product_id` (confirmed
+    against Etsy's real ShopReceiptTransaction schema, not guessed) is the
+    real purchased variation/offering's id -- not a free-text description
+    of which size/color the buyer picked -- so fulfilling correctly means
+    mapping it back through the real inventory this app itself set on the
+    listing (see set_listing_inventory() below), not parsing any string."""
     resp = httpx.get(
         f"{ETSY_API_BASE}/shops/{settings.etsy_shop_id}/receipts",
         headers={"x-api-key": _api_key_header(), "Authorization": f"Bearer {access_token}"},
@@ -320,3 +325,67 @@ def get_listing(listing_id: str, *, access_token: str) -> dict | None:
     if resp.status_code >= 400:
         return None
     return resp.json()
+
+
+def get_taxonomy_properties(taxonomy_id: int) -> list[dict]:
+    """Real per-category property/value definitions (e.g. "Primary color"
+    property_id 200 with value_id 1 = "Black"), confirmed against Etsy's
+    real seller-taxonomy endpoint -- no auth beyond the api-key required
+    (confirmed live). Used to build real, valid property_values for
+    set_listing_inventory() rather than guessing ids."""
+    resp = httpx.get(
+        f"{ETSY_API_BASE}/seller-taxonomy/nodes/{taxonomy_id}/properties",
+        headers={"x-api-key": _api_key_header()},
+        timeout=15,
+    )
+    resp.raise_for_status()
+    return resp.json().get("results", [])
+
+
+def set_listing_inventory(
+    listing_id: str, products: list[dict], *, sku_on_property: list[int], access_token: str,
+) -> tuple[bool, str, list[dict]]:
+    """Real PUT /listings/{listing_id}/inventory (confirmed against Etsy's
+    own OpenAPI spec, requires oauth2 scope listings_w -- already in
+    ETSY_SCOPES). `products` is one entry per real sellable variant
+    (sku/property_values/offerings -- see etsy_manager.py for how these are
+    built from Printify's real variant data). Two real requirements the
+    OpenAPI spec doesn't document, found live by actually calling this
+    against a real test listing rather than trusting the spec alone: (1)
+    every offering needs its own `readiness_state_id` (same shop-level id
+    used at listing creation, not a separate value -- confirmed live),
+    without which Etsy 400s with "All offerings need readiness state"; (2)
+    `sku_on_property` (the property_ids the sku varies by) must be passed
+    at the top level whenever products have distinct skus, or Etsy 400s
+    with "sku must be consistent across all products". On success, Etsy
+    assigns each product a real `product_id` and echoes back the `sku` we
+    sent unchanged -- that's what lets order_fulfillment.py later map a
+    real purchased transaction's `product_id` back to the correct
+    Printify variant_id (sku was set to str(variant_id) deliberately),
+    rather than parsing any free-text variation description."""
+    try:
+        resp = httpx.put(
+            f"{ETSY_API_BASE}/listings/{listing_id}/inventory",
+            headers={"x-api-key": _api_key_header(), "Authorization": f"Bearer {access_token}"},
+            json={"products": products, "sku_on_property": sku_on_property},
+            timeout=30,
+        )
+        resp.raise_for_status()
+        return True, "Real listing inventory/variations set.", resp.json().get("products", [])
+    except httpx.HTTPStatusError as exc:
+        return False, f"Etsy inventory update failed: {exc.response.status_code} {exc.response.text}", []
+    except Exception as exc:  # noqa: BLE001
+        return False, f"Etsy inventory update failed: {exc}", []
+
+
+def get_listing_inventory(listing_id: str, *, access_token: str) -> list[dict]:
+    """Real current inventory/products for a listing -- used to verify a
+    set_listing_inventory() call actually took effect, not just that the
+    PUT returned 200."""
+    resp = httpx.get(
+        f"{ETSY_API_BASE}/listings/{listing_id}/inventory",
+        headers={"x-api-key": _api_key_header(), "Authorization": f"Bearer {access_token}"},
+        timeout=15,
+    )
+    resp.raise_for_status()
+    return resp.json().get("products", [])

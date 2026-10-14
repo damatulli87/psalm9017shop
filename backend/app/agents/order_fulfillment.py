@@ -14,12 +14,17 @@ abandoned carts never trigger fulfillment. Two real delivery paths:
     own docs) -- so submit_order() is a real commitment to print and ship,
     not a draft/preview action.
 
-Known real limitation, not hidden: Etsy listings don't yet have real
-size/color variations set up (see etsy_manager.py / has_variations), so a
-buyer currently can't choose a specific variant at checkout -- every POD
-order ships NICHE_CATALOG_MAP's first listed variant regardless of what a
-buyer might expect. Fixing that for real (building real Etsy listing
-inventory/offerings) is a separate, not-yet-built feature.
+Real size/color variations (2026-10-14): etsy_manager.py now sets real
+Etsy listing inventory/offerings from Printify's own real variant data for
+every multi-variant POD format, and stores the real
+{etsy_product_id: printify_variant_id} map Etsy hands back. _resolve_variant_id()
+below uses the buyer's real transaction product_id to look up the actual
+variant they ordered, falling back to the catalog's first listed variant
+(the old behavior) -- and raising a real concern when it has to -- only
+for a listing created before this feature or a format with nothing to
+vary (single-real-variant products like mug/necklace/tumbler). Not yet
+exercised against a real buyer transaction, since no real sale has
+happened -- same honest caveat as submit_order() below.
 """
 from __future__ import annotations
 
@@ -157,6 +162,40 @@ class OrderFulfillmentAgent(BaseAgent):
             else:
                 self._fulfill_pod(order, receipt, txn, product)
 
+    def _resolve_variant_id(self, order: Order, txn: dict, pod_data: dict, catalog: dict) -> int:
+        """Real fix for the known gap this agent previously flagged: a real
+        buyer's transaction carries a real `product_id` (Etsy's
+        ShopReceiptTransaction schema, confirmed against Etsy's own OpenAPI
+        spec) identifying exactly which real listing variation they
+        bought. etsy_manager.py's _set_real_pod_variations() stores the
+        {etsy_product_id: printify_variant_id} map it got back from Etsy
+        when it set up real inventory on the listing (keyed by the sku it
+        deliberately set to str(variant_id)), so looking that up here is
+        how fulfillment learns which real Printify variant to actually
+        ship -- not a guess. Falls back to the catalog's first listed
+        variant (the prior behavior) only when no mapping exists (e.g. a
+        listing created before this feature, or a single-real-variant
+        product with no mapping at all), and raises a real concern when it
+        has to fall back so the owner can see it happened rather than it
+        being silently assumed correct."""
+        variant_map = pod_data.get("variant_map") or {}
+        etsy_product_id = txn.get("product_id")
+        if etsy_product_id is not None and str(etsy_product_id) in variant_map:
+            return variant_map[str(etsy_product_id)]
+
+        fallback = catalog["variant_ids"][0]
+        if variant_map:
+            # A real mapping exists for this listing but didn't contain the
+            # buyer's actual product_id -- a real mismatch worth a human
+            # looking at, not just a product with nothing to vary.
+            self._raise_concern(
+                summary=f"Order #{order.id}: buyer's real Etsy product_id ({etsy_product_id}) wasn't found "
+                        f"in this listing's known variant map -- shipping the catalog's default variant "
+                        f"instead of the one actually ordered.",
+                payload={"order_id": order.id, "etsy_product_id": etsy_product_id, "fallback_variant_id": fallback},
+            )
+        return fallback
+
     def _fulfill_pod(self, order: Order, receipt: dict, txn: dict, product: ProductSpecification) -> None:
         pod_data = (product.design_brief or {}).get("pod", {})
         printify_product_id = pod_data.get("printify_product_id")
@@ -174,11 +213,7 @@ class OrderFulfillmentAgent(BaseAgent):
                 payload={"order_id": order.id, "product_id": product.id},
             )
             return
-        # Known real limitation: no real Etsy listing variations exist yet,
-        # so there's no way to know which size/color the buyer actually
-        # wanted -- ships the catalog's first listed variant. Flagged, not
-        # silently assumed to be correct.
-        variant_id = catalog["variant_ids"][0]
+        variant_id = self._resolve_variant_id(order, txn, pod_data, catalog)
 
         if not settings.printify_shop_id:
             self._raise_concern(

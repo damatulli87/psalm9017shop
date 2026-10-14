@@ -1,14 +1,21 @@
 """Etsy Store Management Agent (spec section 12)."""
 from __future__ import annotations
 
+import re
 from pathlib import Path
 
 import httpx
 
 from app.agents.base import BaseAgent
+from app.agents.pod_production import _lookup_catalog
 from app.config import settings
-from app.integrations import oauth_store
-from app.integrations.etsy import create_draft_listing, upload_listing_file, upload_listing_image
+from app.integrations import oauth_store, printify
+from app.integrations.etsy import (
+    create_draft_listing,
+    set_listing_inventory,
+    upload_listing_file,
+    upload_listing_image,
+)
 from app.models.models import MarketplaceListing, ProductAsset, ProductSpecification
 
 # Real Etsy seller-taxonomy leaf node ids (looked up live via
@@ -53,6 +60,208 @@ POD_TAXONOMY_BY_FORMAT = {
 # mapped, but 0 is never valid, so this is the defensive floor.
 _DIGITAL_TAXONOMY_FALLBACK = 2078  # Digital Prints
 _POD_TAXONOMY_FALLBACK = 482  # T-shirts
+
+# Real Etsy "Primary color" property (property_id 200) -- confirmed live
+# (2026-10-14, get_taxonomy_properties()) to be the SAME global property
+# with the SAME 19 value_ids across every POD taxonomy used here (t-shirt,
+# mug, hoodie, tote, sticker, cap, necklace, notebook, tumbler), not
+# redefined per category. Keys are lowercased Etsy display names.
+_ETSY_COLOR_VALUE_IDS: dict[str, int] = {
+    "black": 1, "blue": 2, "brown": 3, "green": 4, "gray": 5, "orange": 6,
+    "pink": 7, "purple": 8, "red": 9, "white": 10, "yellow": 11,
+    "beige": 1213, "gold": 1214, "silver": 1215, "bronze": 1216,
+    "rose gold": 1217, "copper": 1218, "clear": 1219, "rainbow": 1220,
+}
+# Printify blank colors that don't exactly match one of Etsy's 19 generic
+# names -- mapped to the closest real bucket rather than dropping the
+# color variation entirely. An approximation, not hidden as anything else.
+_COLOR_ALIASES: dict[str, str] = {
+    "khaki": "beige", "dark green": "green", "dark navy": "blue",
+    "navy": "blue", "lime": "green", "turquoise": "blue",
+}
+
+# Real Etsy "Unisex shirt size" property (property_id 62809790533,
+# scale_id 51 "Unisex letter size") -- confirmed live for both t-shirt
+# (taxonomy 482) and hoodie (1853), the only two POD formats here that
+# have a real discrete size *enum* Etsy recognizes. Other multi-size
+# formats (tote, sticker) are physical dimensions, not a controlled
+# vocabulary Etsy defines -- those use a free-text Custom1 property
+# instead (see _build_inventory_products below).
+_ETSY_SHIRT_SIZE_PROPERTY_ID = 62809790533
+_ETSY_SHIRT_SIZE_SCALE_ID = 51
+_ETSY_SHIRT_SIZE_VALUE_IDS: dict[str, int] = {
+    "XXS": 2133, "XS": 2135, "S": 2137, "M": 2139, "L": 2141,
+    "XL": 2144, "2X": 2147, "3X": 2149, "4X": 2151,
+}
+_ETSY_COLOR_PROPERTY_ID = 200
+_ETSY_CUSTOM_SIZE_PROPERTY_ID = 513  # "Custom1" -- free-text, no controlled vocabulary
+_ETSY_CUSTOM_COLOR_PROPERTY_ID = 514  # "Custom2" -- used only when the real bucketed-color fallback below would collide
+
+# Per POD format: how (if at all) real Etsy listing variations should be
+# built from Printify's real per-variant color/size options. "size": "enum"
+# uses the real shirt-size property above; "custom" uses the free-text
+# Custom1 property for a real physical dimension Etsy has no enum for;
+# None means that axis doesn't vary for this format (e.g. cap/notebook are
+# one size; mug/necklace/tumbler are a single real variant with nothing to
+# choose, so no inventory call is made at all -- see _build_inventory_products).
+POD_VARIATION_CONFIG: dict[str, dict] = {
+    "tshirt": {"color": True, "size": "enum"},
+    "hoodie": {"color": True, "size": "enum"},
+    "tote": {"color": True, "size": "custom"},
+    "sticker": {"color": False, "size": "custom"},
+    "cap": {"color": True, "size": None},
+    "notebook": {"color": True, "size": None},
+}
+
+
+def _normalize_shirt_size(raw: str) -> str | None:
+    """Printify sizes this app actually uses are already S/M/L/XL, or
+    "2XL" -- Etsy's real value names for the same sizes are S/M/L/XL, then
+    "2X" (not "2XL"). Confirmed live against the real property's possible
+    values; a plain string match would have silently matched nothing for
+    any 2XL+ size."""
+    raw = raw.strip().upper()
+    if raw in _ETSY_SHIRT_SIZE_VALUE_IDS:
+        return raw
+    match = re.match(r"^(\d+)XL$", raw)
+    if match:
+        candidate = f"{match.group(1)}X"
+        if candidate in _ETSY_SHIRT_SIZE_VALUE_IDS:
+            return candidate
+    return None
+
+
+def _etsy_color_value_id(raw: str) -> tuple[str, int] | None:
+    key = raw.strip().lower()
+    key = _COLOR_ALIASES.get(key, key)
+    value_id = _ETSY_COLOR_VALUE_IDS.get(key)
+    if value_id is None:
+        return None
+    return key.title() if key != "white" else "White", value_id
+
+
+def _colors_collide(real_color_names: set[str]) -> bool:
+    """Real bug this caught before it ever reached a live listing: Printify's
+    real notebook catalog has 8 distinct blank colors (Black/Blue/Lime/Navy/
+    Orange/Red/Silver/Turquoise), but Etsy's 19-color generic bucket has no
+    "Navy" or "Turquoise" -- both would silently collapse into the SAME
+    "Blue" as the catalog's actual real Blue, making 3 of 8 variants
+    indistinguishable to a buyer (and almost certainly rejected by Etsy as
+    duplicate variations). Checked against the real distinct colors actually
+    used by THIS product, not assumed safe just because the alias table
+    resolves every name to *something*."""
+    buckets = [_etsy_color_value_id(name) for name in real_color_names]
+    resolved = [b[1] for b in buckets if b]
+    return len(resolved) != len(set(resolved))
+
+
+def _build_inventory_products(product: ProductSpecification, catalog: dict, price_usd: float) -> list[dict] | None:
+    """Builds the real `products` array for set_listing_inventory() from
+    Printify's own real per-variant option data -- never guessed. Returns
+    None when there's nothing to vary (a single real variant has no real
+    choice to offer a buyer, so no inventory call is made and the
+    listing's default single price/quantity already correctly represents
+    it)."""
+    variant_ids = catalog.get("variant_ids") or []
+    if len(variant_ids) <= 1:
+        return None
+
+    config = POD_VARIATION_CONFIG.get(product.format)
+    if config is None:
+        return None
+
+    real_variants = {
+        v["id"]: v.get("options", {})
+        for v in printify.get_variants(catalog["blueprint_id"], catalog["print_provider_id"])
+        if v["id"] in set(variant_ids)
+    }
+
+    # Decided once per product (not per variant): if Etsy's generic color
+    # bucket would make two of THIS product's real distinct colors
+    # indistinguishable, use the real literal color name as free text
+    # instead of the lossy enum for every variant -- never a per-variant
+    # mix of the two, which would make the listing's variations inconsistent.
+    use_literal_color_names = False
+    if config.get("color"):
+        real_color_names = {
+            (options.get("color") or options.get("surface"))
+            for options in real_variants.values()
+            if options.get("color") or options.get("surface")
+        }
+        use_literal_color_names = _colors_collide(real_color_names)
+
+    products = []
+    for variant_id in variant_ids:
+        options = real_variants.get(variant_id, {})
+        property_values = []
+
+        if config.get("color"):
+            color_raw = options.get("color") or options.get("surface")
+            if color_raw and use_literal_color_names:
+                property_values.append({
+                    "property_id": _ETSY_CUSTOM_COLOR_PROPERTY_ID,
+                    "property_name": "Color",
+                    "value_ids": [],
+                    "values": [color_raw],
+                })
+            elif color_raw:
+                matched = _etsy_color_value_id(color_raw)
+                if matched:
+                    display_name, value_id = matched
+                    property_values.append({
+                        "property_id": _ETSY_COLOR_PROPERTY_ID,
+                        "property_name": "Primary color",
+                        "value_ids": [value_id],
+                        "values": [display_name],
+                    })
+
+        size_mode = config.get("size")
+        size_raw = options.get("size")
+        if size_mode == "enum" and size_raw:
+            normalized = _normalize_shirt_size(size_raw)
+            if normalized:
+                property_values.append({
+                    "property_id": _ETSY_SHIRT_SIZE_PROPERTY_ID,
+                    "property_name": "Size",
+                    "scale_id": _ETSY_SHIRT_SIZE_SCALE_ID,
+                    "value_ids": [_ETSY_SHIRT_SIZE_VALUE_IDS[normalized]],
+                    "values": [normalized],
+                })
+        elif size_mode == "custom" and size_raw:
+            property_values.append({
+                "property_id": _ETSY_CUSTOM_SIZE_PROPERTY_ID,
+                "property_name": "Size",
+                "value_ids": [],
+                "values": [size_raw],
+            })
+
+        if not property_values:
+            continue  # nothing real to vary on for this axis -- skip rather than send an empty product
+
+        products.append({
+            "sku": str(variant_id),
+            "property_values": property_values,
+            # readiness_state_id here is required by the real inventory API
+            # even though the listing itself already has one set at
+            # creation -- confirmed live: omitting it 400s with "All
+            # offerings need readiness state". Same shop-level id either way.
+            "offerings": [{
+                "price": round(price_usd, 2), "quantity": 999, "is_enabled": True,
+                "readiness_state_id": settings.etsy_readiness_state_id,
+            }],
+        })
+
+    return products or None
+
+
+def _sku_on_property(inventory_products: list[dict]) -> list[int]:
+    """Real top-level field the inventory PUT requires whenever products
+    have distinct skus (confirmed live: omitting it 400s with "sku must be
+    consistent across all products") -- the property_ids the sku actually
+    varies by, read back from the products actually built rather than
+    assumed from config (color may have switched to the literal-name
+    Custom2 property at runtime if a collision was detected)."""
+    return sorted({pv["property_id"] for p in inventory_products for pv in p["property_values"]})
 
 
 def _taxonomy_id_for(product: ProductSpecification) -> int:
@@ -192,4 +401,79 @@ class EtsyManagerAgent(BaseAgent):
                     )
                     listing.status = "creation_failed"
                     self.db.commit()
+            else:
+                self._set_real_pod_variations(product, listing, access_token)
         return listing
+
+    def _set_real_pod_variations(self, product: ProductSpecification, listing: MarketplaceListing,
+                                  access_token: str) -> None:
+        """Real fix for the known gap flagged in order_fulfillment.py: a POD
+        listing with no real Etsy variations means a buyer can't actually
+        pick a size/color, and fulfillment has no way to know which real
+        Printify variant they wanted. Builds real property_values/offerings
+        from Printify's own real per-variant option data (never guessed)
+        and PUTs them via set_listing_inventory(). On success, stores the
+        real {etsy_product_id: printify_variant_id} map Etsy hands back
+        (sku was deliberately set to str(variant_id), so it's echoed
+        unchanged) onto product.design_brief so order_fulfillment.py can
+        look up exactly which variant a real buyer purchased instead of
+        defaulting to the catalog's first listed one. Not fatal if it
+        fails or doesn't apply (single-real-variant products like mug/
+        necklace/tumbler correctly have nothing to vary) -- the listing is
+        still a valid, sellable listing either way, just degraded to the
+        pre-existing default-variant behavior, which is why this is logged
+        as a concern rather than downgrading listing.status."""
+        catalog = _lookup_catalog(product.title)
+        if not catalog:
+            return
+        inventory_products = _build_inventory_products(product, catalog, product.recommended_price_usd)
+        if not inventory_products:
+            self.log(
+                "listing_variations_not_applicable",
+                f"Listing #{listing.id}: product #{product.id} has a single real Printify variant "
+                f"or no configured variation mapping -- no real Etsy variations to set.",
+                {"listing_id": listing.id},
+            )
+            return
+
+        success, detail, real_products = set_listing_inventory(
+            listing.external_listing_id, inventory_products,
+            sku_on_property=_sku_on_property(inventory_products), access_token=access_token,
+        )
+        self.log(
+            "listing_variations_set" if success else "listing_variations_failed",
+            f"Listing #{listing.id} real Etsy variations: {detail}",
+            {"listing_id": listing.id, "success": success, "variant_count": len(inventory_products)},
+        )
+        if not success:
+            self._raise_concern(
+                summary=f"Listing #{listing.id}: failed to set real Etsy size/color variations -- "
+                        f"a buyer cannot pick a variant, and fulfillment will default to the catalog's "
+                        f"first listed one for every order on this listing.",
+                payload={"listing_id": listing.id, "product_id": product.id, "detail": detail},
+            )
+            return
+
+        # sku was set to str(variant_id) when building inventory_products,
+        # and Etsy echoes it back unchanged -- this is the real mapping
+        # order_fulfillment.py needs from a purchased transaction's real
+        # product_id back to the correct Printify variant_id.
+        variant_map = {
+            str(p["product_id"]): int(p["sku"])
+            for p in real_products
+            if p.get("sku") and str(p["sku"]).isdigit()
+        }
+        design_brief = dict(product.design_brief or {})
+        pod_data = dict(design_brief.get("pod", {}))
+        pod_data["variant_map"] = variant_map
+        design_brief["pod"] = pod_data
+        product.design_brief = design_brief
+        self.db.commit()
+
+    def _raise_concern(self, *, summary: str, payload: dict) -> None:
+        from app.models.models import Approval
+        self.db.add(Approval(
+            action_type="operational_concern", summary=summary, payload=payload,
+            estimated_cost_usd=0.0, risk_level="medium", requested_by_agent=self.key, status="pending",
+        ))
+        self.db.commit()

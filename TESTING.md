@@ -71,10 +71,71 @@ real Printify production order can't be created in a test run):
   scheduler run must never double-process the same real Etsy receipt into
   two orders/sales.
 
-Last verified run: all 6 passed. **Not covered by any test, deliberately:**
-a real end-to-end call to `printify.submit_order()` against the live API --
-doing so would place a real, costly production order and attempt a real
-shipment with no real buyer behind it.
+Last verified run: all 8 passed (6 above plus
+`test_pod_order_ships_the_real_purchased_variant_when_mapped` and
+`_falls_back_and_flags_concern_when_product_id_unmapped`, added alongside
+the real size/color variation fix below). **Not covered by any test,
+deliberately:** a real end-to-end call to `printify.submit_order()`
+against the live API -- doing so would place a real, costly production
+order and attempt a real shipment with no real buyer behind it.
+
+`backend/tests/test_etsy_variations.py` -- real Etsy listing size/color
+variation tests, added in direct response to "correct the size and color
+issue." `printify.get_variants()` is monkeypatched to the exact real
+response shape captured live (2026-10-14), not a simplified stand-in; the
+Etsy property/value ids used (color property 200, shirt-size property
+62809790533) are the real ones confirmed live via
+`get_taxonomy_properties()`:
+- `test_tshirt_builds_real_color_and_normalized_size_for_every_variant` --
+  confirms Printify's real "2XL" correctly normalizes to Etsy's real "2X"
+  value (a plain string match would silently match nothing), and every
+  offering carries the real `readiness_state_id` the live API requires.
+- `test_cap_colors_with_no_exact_etsy_match_fall_back_to_nearest_generic_bucket`
+  -- Khaki/Dark Green/Dark Navy have no exact match in Etsy's 19-color
+  generic list; confirms they map to the nearest real bucket (Beige/Green/
+  Blue) rather than being dropped.
+- `test_notebook_color_collision_falls_back_to_real_literal_names` -- the
+  real bug this caught before it ever reached a live listing: the
+  notebook's real Blue/Navy/Turquoise would all collapse into Etsy's
+  single generic "Blue," making 3 of 8 variants indistinguishable.
+  Confirms the fallback to real literal color names as free text.
+- `test_single_real_variant_product_returns_none` -- mug/necklace/tumbler
+  have one real variant; confirms no inventory call is attempted.
+- `test_sku_on_property_reflects_actual_properties_used` /
+  `test_normalize_shirt_size_handles_plain_and_printify_style_names` --
+  the two undocumented real API requirements found live (every offering
+  needs `readiness_state_id`; `sku_on_property` is required once products
+  have distinct skus) and the size-name normalization logic.
+
+Last verified run: all 6 passed. The real `set_listing_inventory()` PUT
+call itself was verified live against a real test draft listing
+(external_listing_id 4595180993, t-shirt taxonomy) -- all 10 variants
+landed with correct real product_ids, confirmed via a fresh
+`get_listing_inventory()` read-back. **That real test listing still needs
+manual deletion** (same `listings_d` scope gap as prior test listings this
+session) -- it's a draft, never published, clearly titled "Internal
+variation test listing, please delete."
+
+`backend/tests/test_chore_chart_generator.py` /
+`test_digital_content_plan.py` -- real digital-product content-quality
+tests, added in direct response to "the chore chart we are creating is
+super super basic compared to ones selling for $5 on etsy." Both actually
+render the real PDF and inspect it (page count, dimensions, real AcroForm
+field counts/types), not just confirm `generate_*()` runs without raising:
+- Chore chart: confirms the real 5-page bundle (cover, instructions,
+  weekly, monthly, reward/allowance) and its 128 real fillable fields (124
+  checkboxes + 4 text fields).
+- Content plan: confirms the real checklist/table/tracker renderer
+  produces real fillable fields, that a wide (6-column) table never
+  overlaps column headers (a real bug found by actually rendering and
+  looking at a real generated wedding-planning PDF, not just generating
+  it -- fixed with real `stringWidth`-based truncation instead of a flat
+  character count), and that the content-plan validator accepts real-shaped
+  AI output while rejecting malformed shapes (including a real wrong-shape
+  LLM response actually observed live: `{"section", "description",
+  "subsections"}` instead of the requested schema).
+
+Last verified run: all 9 passed (3 + 6).
 
 ## What's NOT built yet
 
