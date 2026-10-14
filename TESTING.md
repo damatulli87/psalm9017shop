@@ -240,6 +240,36 @@ kids' chart), produced "Parents and caregivers of children with ADHD or
 executive function challenges..." as the real target_customer -- correctly
 grounded in the real evidence rather than a generic niche-name assumption.
 
+**Follow-up same day: "did it pick up what is selling the most not just
+top favorited... we want the designs to be close to the ones that are
+winning illustration wise."** Re-verified exhaustively against the real
+downloaded Etsy OpenAPI spec that no sales/review/bestseller field exists
+anywhere for listings the shop doesn't own (checked `sold_count`,
+`reviews`, `bestseller`, `star_seller`, `popularity`, `rank` -- the only
+real "rank" hits are display-order fields like `featured_rank`, not sales
+rank) -- favorites remains the real, honest ceiling of what's available,
+already confirmed applying to POD niches too (not just digital; live-
+checked "faith cross necklace" alongside the chore-chart check above).
+The second half surfaced a real, separate bug: `backend/tests/test_pod_style_guidance.py`
+covers `pod_production.py`'s `_real_style_guidance()`, which used to
+treat all 10 top-favorited listings as equally informative when
+synthesizing a style pattern -- diluting a real standout with much
+weaker performers. Confirmed live for "Faith Cross Necklaces" (410/212
+favorites for the real top two, then 19-51 for the rest of a real
+10-result sample):
+- `test_style_guidance_samples_15_not_10` -- widened the sample to match
+  market_intelligence.py's sample size.
+- `test_style_guidance_prompt_includes_real_favorite_counts_and_weighting_instruction`
+  -- confirms each listing's real favorite count reaches the model (not
+  just titles) and that the system prompt explicitly instructs weighting
+  toward real standouts rather than a flat blend.
+
+Last verified run: both passed. Verified live: the real necklace data
+above now produces "Minimalist dainty cross silhouette paired with
+gift-set or multi-piece composition styling" -- correctly reflecting the
+real #1 listing's actual characteristics instead of an averaged-down
+generic description. Full suite: 47/47.
+
 ## What's NOT built yet
 
 - Unit tests for individual agents/generators in isolation (today they're

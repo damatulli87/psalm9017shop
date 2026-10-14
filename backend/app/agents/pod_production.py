@@ -170,10 +170,27 @@ _PHYSICAL_OBJECT_NAMES = (
 def _real_style_guidance(db, agent_key: str, product: ProductSpecification) -> str | None:
     """Real competitive research: searches Etsy's actual live listings for
     this niche, sorts by real num_favorers (favorites), and asks a real AI
-    call to extract common VISUAL/STYLE patterns across the top results --
-    never a specific design, and never material/fabrication claims (fine
-    jewelry results for "cross necklace" mention sterling silver, gold,
-    etc. that don't apply to a printed design and must not leak in).
+    call to extract VISUAL/STYLE patterns -- never a specific design, and
+    never material/fabrication claims (fine jewelry results for "cross
+    necklace" mention sterling silver, gold, etc. that don't apply to a
+    printed design and must not leak in).
+
+    Weighted toward the real standout(s), not averaged flat across the
+    whole sample (owner directive, 2026-10-14: "we want the designs to be
+    close to the ones that are winning illustration wise") -- confirmed
+    live this matters: a real "Faith Cross Necklaces" search came back
+    410/212 favorites for the top two, then a steep drop to 19-51 for the
+    rest. Treating all 10 as equally informative would have diluted the
+    two real winners' style with eight much-less-proven listings. The real
+    favorite counts are given to the model directly so it can see the
+    magnitude gap itself, with an explicit instruction to weight toward
+    whichever listings are disproportionately ahead. Still never describes
+    one single listing's exact design (that's a real copying/IP risk) --
+    synthesizes the pattern the real standout(s) share, which is also why
+    this reads differently from a flat average even when there's only one
+    clear winner: the output is "what makes the winner(s) distinct", not
+    "what's common across ten listings regardless of how well each did."
+
     Returns None (caller falls back to generic guidance) if Etsy isn't
     connected, the search fails, or the AI call is mock/unparseable --
     this is a real enhancement, not a hard requirement to produce art."""
@@ -181,26 +198,34 @@ def _real_style_guidance(db, agent_key: str, product: ProductSpecification) -> s
     if not settings.etsy_configured or not token:
         return None
     try:
-        top = search_top_listings(product.title, access_token=token, sample_size=50, top_n=10)
+        top = search_top_listings(product.title, access_token=token, sample_size=50, top_n=15)
     except Exception:  # noqa: BLE001
         return None
     if not top:
         return None
 
-    listing_lines = "\n".join(f"- {t['title']} (tags: {', '.join(t['tags'][:6])})" for t in top)
+    listing_lines = "\n".join(
+        f"- [{t['num_favorers']} favorites] {t['title']} (tags: {', '.join(t['tags'][:6])})" for t in top
+    )
     resp = ai_providers.complete(
         db,
         agent_key=agent_key,
         system_prompt=(
-            "You analyze real top-performing Etsy listings to extract common VISUAL/DESIGN style "
-            "patterns only. Never describe any single listing -- synthesize patterns across several. "
-            "Never mention specific materials, brands, or fabrication methods (e.g. sterling silver, "
-            "gold-filled) since those don't apply to a printed design. Respond with one short phrase "
-            "(max 30 words), no preamble."
+            "You analyze real top-performing Etsy listings to extract VISUAL/DESIGN style patterns, "
+            "weighted toward whichever listings are REAL standouts by favorites, not averaged flat "
+            "across the whole list. Each listing's real favorite count is given -- if one or two pull "
+            "disproportionately more favorites than the rest, your answer should reflect what makes "
+            "THOSE visually distinct, not a generic blend of all of them. Never describe any single "
+            "listing's exact design (describe the pattern the real winners share, not one winner's "
+            "specific piece). Never mention specific materials, brands, or fabrication methods (e.g. "
+            "sterling silver, gold-filled) since those don't apply to a printed design. Respond with "
+            "one short phrase (max 30 words), no preamble."
         ),
-        user_prompt=f"These are the most-favorited real Etsy listings for '{product.title}':\n{listing_lines}\n\n"
+        user_prompt=f"These are real Etsy listings for '{product.title}', most-favorited first, with their "
+                    f"real favorite counts:\n{listing_lines}\n\n"
                     f"In one short phrase, what visual/illustration style elements (shapes, motifs, "
-                    f"composition) do the best-performing ones have in common?",
+                    f"composition) does whichever listing(s) are the REAL standouts here have that the "
+                    f"rest don't?",
         task_hint="design_style_research",
         complexity="routine",
         workflow_run_id=None,
