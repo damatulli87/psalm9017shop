@@ -13,8 +13,15 @@ See [README.md](README.md) Quickstart. In short:
 ```bash
 cd backend && python -m venv venv && source venv/Scripts/activate
 pip install -r requirements.txt && alembic upgrade head
-uvicorn app.main:app --reload --port 8000
+uvicorn app.main:app --reload --reload-dir app --port 8000
 ```
+`--reload-dir app` matters, not just `--reload` alone: without it, uvicorn
+watches the entire `backend/` tree including `venv/` -- real impact found
+live (2026-10-14), installing one new pip package (`pip install fonttools`,
+for a one-time font-processing step) triggered a reload storm from
+hundreds of newly-written files under `venv/Lib/site-packages/`. Scoping
+the watch to `app/` avoids that entirely and is also just more correct --
+only real source code should trigger a reload.
 ```bash
 cd frontend && npm install && npm run dev
 ```
