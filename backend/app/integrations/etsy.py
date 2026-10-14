@@ -122,10 +122,17 @@ def create_draft_listing(
         "is_digital": is_digital,
         "state": "draft",
     }
-    if not is_digital:
-        # Etsy requires both for every physical listing.
-        payload["shipping_profile_id"] = settings.etsy_shipping_profile_id
-        payload["readiness_state_id"] = settings.etsy_readiness_state_id
+    # Confirmed live (2026-10-14): Etsy's v3 listing-creation endpoint
+    # requires shipping_profile_id AND readiness_state_id for EVERY
+    # listing at creation time, even with is_digital=True -- a digital
+    # listing is created as listing_type "physical" regardless, and only
+    # actually becomes listing_type "download" once a real digital file is
+    # attached via a separate call (see upload_listing_file() below). The
+    # earlier assumption that digital listings skip these fields was wrong
+    # and had never been tested against a real listing until a real
+    # opportunity actually reached this stage.
+    payload["shipping_profile_id"] = settings.etsy_shipping_profile_id
+    payload["readiness_state_id"] = settings.etsy_readiness_state_id
 
     if not settings.etsy_configured or not access_token:
         return EtsyListingResult(
@@ -138,29 +145,29 @@ def create_draft_listing(
             ),
             request_payload=payload,
         )
-    if not is_digital and not settings.etsy_shipping_profile_id:
+    if not settings.etsy_shipping_profile_id:
         return EtsyListingResult(
             success=False,
             simulated=True,
             external_listing_id=None,
             detail=(
-                "Cannot create a real physical listing: no ETSY_SHIPPING_PROFILE_ID configured. "
-                "Etsy requires a real shipping profile (cost/handling time) for every physical "
-                "listing -- that's a real shipping-cost decision, not something to guess. Create "
-                "one in Etsy's Shop Manager > Settings > Shipping settings, or ask to have one "
-                "created via the API with specific real rates."
+                "Cannot create a real listing: no ETSY_SHIPPING_PROFILE_ID configured. Etsy "
+                "requires a real shipping profile for every listing, digital or physical -- "
+                "that's a real shipping-cost decision, not something to guess. Create one in "
+                "Etsy's Shop Manager > Settings > Shipping settings, or ask to have one created "
+                "via the API with specific real rates."
             ),
             request_payload=payload,
         )
-    if not is_digital and not settings.etsy_readiness_state_id:
+    if not settings.etsy_readiness_state_id:
         return EtsyListingResult(
             success=False,
             simulated=True,
             external_listing_id=None,
             detail=(
-                "Cannot create a real physical listing: no ETSY_READINESS_STATE_ID configured. "
-                "Etsy requires a shop-level readiness-state-definition (made_to_order vs "
-                "ready_to_ship + processing time) for every physical listing."
+                "Cannot create a real listing: no ETSY_READINESS_STATE_ID configured. Etsy "
+                "requires a shop-level readiness-state-definition (made_to_order vs ready_to_ship "
+                "+ processing time) for every listing, digital or physical."
             ),
             request_payload=payload,
         )
@@ -177,6 +184,16 @@ def create_draft_listing(
         return EtsyListingResult(
             success=True, simulated=False, external_listing_id=str(data.get("listing_id")),
             detail="Draft listing created via Etsy Open API v3.", request_payload=payload,
+        )
+    except httpx.HTTPStatusError as exc:
+        # str(exc) alone discards the response BODY, which is where Etsy
+        # puts the actually useful error ("A shipping_profile_id is
+        # required...") -- this cost real debugging time more than once
+        # (taxonomy_id, shipping/readiness) before being fixed here once.
+        return EtsyListingResult(
+            success=False, simulated=False, external_listing_id=None,
+            detail=f"Etsy API call failed: {exc.response.status_code} {exc.response.text}",
+            request_payload=payload,
         )
     except Exception as exc:  # noqa: BLE001
         return EtsyListingResult(
@@ -203,6 +220,32 @@ def upload_listing_image(
         return True, "Listing image uploaded."
     except Exception as exc:  # noqa: BLE001
         return False, f"Etsy image upload failed: {exc}"
+
+
+def upload_listing_file(
+    *, access_token: str, listing_id: str, file_bytes: bytes, file_name: str, rank: int = 1,
+) -> tuple[bool, str]:
+    """The actual deliverable (ZIP) for a digital product. Confirmed live
+    (2026-10-14) this is the ONLY thing that makes Etsy treat a listing as
+    a real digital download -- create_draft_listing() with is_digital=True
+    alone creates a listing_type "physical" listing regardless; it only
+    flips to listing_type "download" once a real file is attached here.
+    Before this was discovered, a "successful" digital listing would have
+    shipped a buyer literally nothing."""
+    try:
+        resp = httpx.post(
+            f"{ETSY_API_BASE}/shops/{settings.etsy_shop_id}/listings/{listing_id}/files",
+            headers={"x-api-key": _api_key_header(), "Authorization": f"Bearer {access_token}"},
+            files={"file": (file_name, file_bytes, "application/octet-stream")},
+            data={"name": file_name, "rank": rank},
+            timeout=30,
+        )
+        resp.raise_for_status()
+        return True, "Digital file uploaded; listing is now a real download listing."
+    except httpx.HTTPStatusError as exc:
+        return False, f"Etsy file upload failed: {exc.response.status_code} {exc.response.text}"
+    except Exception as exc:  # noqa: BLE001
+        return False, f"Etsy file upload failed: {exc}"
 
 
 def search_top_listings(keyword: str, *, access_token: str, sample_size: int = 50, top_n: int = 10) -> list[dict]:

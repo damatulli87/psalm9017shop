@@ -8,7 +8,7 @@ import httpx
 from app.agents.base import BaseAgent
 from app.config import settings
 from app.integrations import oauth_store
-from app.integrations.etsy import create_draft_listing, upload_listing_image
+from app.integrations.etsy import create_draft_listing, upload_listing_file, upload_listing_image
 from app.models.models import MarketplaceListing, ProductAsset, ProductSpecification
 
 # Real Etsy seller-taxonomy leaf node ids (looked up live via
@@ -153,4 +153,43 @@ class EtsyManagerAgent(BaseAgent):
                     f"No image available to upload for product #{product.id}.",
                     {"listing_id": listing.id},
                 )
+
+            # Confirmed live (2026-10-14): create_draft_listing(is_digital=True)
+            # alone does NOT make Etsy treat this as a real download listing --
+            # it's created as listing_type "physical" regardless, and only
+            # flips to "download" once a real file is attached here. Without
+            # this, a "successful" digital listing would ship a buyer nothing.
+            # A digital product with no file attached is not a valid listing,
+            # so a failure here downgrades listing.status the same way a
+            # failed listing creation does -- not left as a silently broken
+            # "draft" that could reach owner approval.
+            if product.product_type == "digital":
+                zip_asset = self.db.query(ProductAsset).filter(
+                    ProductAsset.product_id == product.id, ProductAsset.asset_type == "zip"
+                ).first()
+                if zip_asset and Path(zip_asset.file_path).exists():
+                    file_path = Path(zip_asset.file_path)
+                    uploaded, detail = upload_listing_file(
+                        access_token=access_token,
+                        listing_id=result.external_listing_id,
+                        file_bytes=file_path.read_bytes(),
+                        file_name=file_path.name,
+                    )
+                    self.log(
+                        "listing_file_uploaded" if uploaded else "listing_file_upload_failed",
+                        f"Listing #{listing.id} digital file upload: {detail}",
+                        {"listing_id": listing.id, "uploaded": uploaded},
+                    )
+                    if not uploaded:
+                        listing.status = "creation_failed"
+                        self.db.commit()
+                else:
+                    self.log(
+                        "listing_file_upload_skipped",
+                        f"No delivery ZIP found on disk for product #{product.id} -- "
+                        f"cannot create a valid digital listing without it.",
+                        {"listing_id": listing.id},
+                    )
+                    listing.status = "creation_failed"
+                    self.db.commit()
         return listing
