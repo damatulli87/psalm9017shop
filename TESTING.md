@@ -111,10 +111,10 @@ Last verified run: all 6 passed. The real `set_listing_inventory()` PUT
 call itself was verified live against a real test draft listing
 (external_listing_id 4595180993, t-shirt taxonomy) -- all 10 variants
 landed with correct real product_ids, confirmed via a fresh
-`get_listing_inventory()` read-back. **That real test listing still needs
-manual deletion** (same `listings_d` scope gap as prior test listings this
-session) -- it's a draft, never published, clearly titled "Internal
-variation test listing, please delete."
+`get_listing_inventory()` read-back. That real test listing has since
+disappeared on its own (checked after the fact -- Etsy appears to expire
+unpublished draft listings after a while, same as 4 of the 5 earlier test
+listings this session), so no manual cleanup was needed for this one.
 
 `backend/tests/test_chore_chart_generator.py` /
 `test_digital_content_plan.py` -- real digital-product content-quality
@@ -136,6 +136,41 @@ field counts/types), not just confirm `generate_*()` runs without raising:
   "subsections"}` instead of the requested schema).
 
 Last verified run: all 9 passed (3 + 6).
+
+**Real end-to-end pipeline verification (2026-10-14):** the owner asked to
+actually run a real pipeline and look at what it produces. First run
+failed at `listing_creation` -- investigation found the real cause wasn't
+a code bug at all: the running `uvicorn` process had been up since before
+all of this session's fixes and was never restarted (started without
+`--reload`, deviating from the documented dev command in DEPLOYMENT.md),
+so it was serving stale code -- confirmed by the generated chore-chart PDF
+having only the old 2 pages / 0 form fields. Restarted the server (this
+time with `--reload`, matching DEPLOYMENT.md, so this can't silently
+recur) and re-ran: real research (8 real niches, Google Trends real for
+most, a couple rate-limited/"UNAVAILABLE" as already known), real
+differentiated opportunity scoring (0.72 selected over 0.39-0.52
+rejected), a real 5-page fillable chore-chart bundle generated, a real
+AI-generated listing photo, and a real Etsy listing successfully created
+end-to-end (external_listing_id 4595212237, verified by fetching the
+listing and its uploaded photo directly from Etsy's CDN) -- now sitting
+in the real approval queue (SUPERVISED mode) same as every other listing.
+
+That real run also surfaced a second, genuine code bug:
+`backend/tests/test_seo_tags.py` -- the AI is told Etsy tags must be <=20
+characters but doesn't reliably respect that, and the old `tag[:20]` slice
+cut tags mid-word -- reached the real live listing above with tags like
+"chore chart printabl" (should be "printable") and "kids responsibility "
+(a dangling trailing space where the word was cut clean off). Fixed with
+`_truncate_tag()` (word-boundary truncation, or drop the tag entirely if
+even the first word doesn't fit), verified by regenerating real SEO copy
+for the real product and confirming all 13 tags came back clean.
+`backend/tests/test_listing_hygiene.py` covers the companion fix:
+`UltronSupervisorAgent.verify_listing_hygiene()` gained a new
+deterministic check (`listing_hygiene_no_mangled_tags`) for a tag that
+doesn't equal its own `.strip()`, so a regression of this exact failure
+mode would be caught automatically on the next run.
+
+Last verified run: all 7 passed (5 + 2). Full suite: 34/34.
 
 ## What's NOT built yet
 

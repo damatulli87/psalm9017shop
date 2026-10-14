@@ -272,6 +272,18 @@ class UltronSupervisorAgent(BaseAgent):
         else:
             findings.append(_finding("listing_hygiene_no_duplicated_title", PASS, "Title does not repeat the same segment."))
 
+        # Real bug found live (2026-10-14): a naive tag[:20] slice cut tags
+        # mid-word and reached a real listing with tags like "chore chart
+        # printabl" and a dangling trailing space where the word was cut
+        # clean off ("kids responsibility "). A tag that doesn't equal its
+        # own .strip() is an unambiguous, deterministic signal of exactly
+        # that failure mode -- no LLM judgment needed to catch it.
+        mangled = [t for t in (listing.tags or []) if t != t.strip() or not t.strip()]
+        if mangled:
+            findings.append(_finding("listing_hygiene_no_mangled_tags", FAIL, f"Listing #{listing.id} has mangled tag(s): {mangled!r}."))
+        else:
+            findings.append(_finding("listing_hygiene_no_mangled_tags", PASS, "No mangled/truncated tags found."))
+
         return findings
 
     def verify_tasks(self, run: WorkflowRun) -> list[dict]:

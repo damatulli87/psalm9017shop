@@ -67,6 +67,24 @@ def _fallback_tags(niche: str, product: ProductSpecification) -> list[str]:
     return list(dict.fromkeys(base + extra))[:13]
 
 
+def _truncate_tag(raw: str, max_len: int = 20) -> str | None:
+    """Real bug found live (2026-10-14): the AI is told tags must be <=20
+    chars but doesn't reliably respect that, and a plain `tag[:20]` slice
+    cut tags mid-word -- real examples that reached a real listing:
+    "chore chart printabl" (should be "printable"), "kids responsibility "
+    (trailing space, word cut clean off). Truncates at the last real word
+    boundary within the limit instead; if even the first word alone
+    exceeds the limit, drops the tag entirely rather than mutilating it."""
+    tag = raw.strip()
+    if not tag:
+        return None
+    if len(tag) <= max_len:
+        return tag
+    truncated = tag[:max_len]
+    last_space = truncated.rfind(" ")
+    return truncated[:last_space].strip() if last_space > 0 else None
+
+
 def _ai_tags(db, agent_key: str, product: ProductSpecification, niche: str) -> list[str] | None:
     """Real Etsy tags should be phrases a buyer would actually search --
     not a mechanical split of the niche name. Asks the real model for
@@ -94,7 +112,7 @@ def _ai_tags(db, agent_key: str, product: ProductSpecification, niche: str) -> l
         return None
     if not isinstance(parsed, list) or not all(isinstance(t, str) for t in parsed):
         return None
-    tags = [t.strip()[:20] for t in parsed if t.strip()]
+    tags = [t for t in (_truncate_tag(raw) for raw in parsed) if t]
     return list(dict.fromkeys(tags))[:13] or None
 
 
