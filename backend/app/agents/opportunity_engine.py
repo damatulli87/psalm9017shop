@@ -23,6 +23,32 @@ DEFAULT_WEIGHTS = {
 
 MINIMUM_SCORE_DEFAULT = 0.55
 
+# Real market-saturation thresholds -- active Etsy listing count for the
+# keyword (app/agents/market_intelligence.py now fetches this for real via
+# app/integrations/etsy.py:get_active_listing_count) mapped to a competitive-
+# opportunity score. Lower listing count = less saturated = better
+# opportunity for a new entrant. The specific cutoffs are a judgment call
+# (there's no single "correct" saturation curve), but they're applied to a
+# real retrieved number, not a guess -- confirmed live: "cross necklace"
+# (218k listings, highly saturated) vs "printable chore chart" (36k,
+# moderate) vs a long-tail niche keyword (under 1k, wide open) are real,
+# meaningfully different numbers this curve should treat differently.
+_COMPETITION_THRESHOLDS = [
+    (500, 0.90),
+    (2_000, 0.75),
+    (10_000, 0.55),
+    (50_000, 0.35),
+    (200_000, 0.20),
+]
+_COMPETITION_SATURATED_SCORE = 0.10
+
+
+def _competition_score_from_listing_count(count: int) -> float:
+    for ceiling, score in _COMPETITION_THRESHOLDS:
+        if count < ceiling:
+            return score
+    return _COMPETITION_SATURATED_SCORE
+
 
 class OpportunityDecisionEngine(BaseAgent):
     key = "opportunity_engine"
@@ -52,9 +78,13 @@ class OpportunityDecisionEngine(BaseAgent):
             demand_score = 0.15
             confidence = "low"
 
-        # --- Competitive opportunity: Etsy data unavailable without credentials -> capped low-confidence midpoint.
-        competition_score = 0.40  # neutral/unknown, deliberately not optimistic
-        if "BLOCKED" in str(evidence.get("etsy_competition_data", "")):
+        # --- Competitive opportunity: real Etsy active-listing count when available
+        # (market_intelligence.py fetches this live), never a guess otherwise --
+        # same "missing evidence reduces confidence" rule as demand above.
+        if evidence.get("etsy_competition_is_real") and evidence.get("etsy_listing_count") is not None:
+            competition_score = _competition_score_from_listing_count(evidence["etsy_listing_count"])
+        else:
+            competition_score = 0.40  # neutral/unknown, deliberately not optimistic
             confidence = "low"
 
         # --- Profitability / feasibility / differentiation / risk: category-based heuristics
@@ -68,7 +98,11 @@ class OpportunityDecisionEngine(BaseAgent):
             feasibility_score = 0.60
             risk_score = 0.65
 
-        differentiation_score = 0.50  # unknown without real competitive data; neutral default
+        # Real competitive search exists now (app/integrations/etsy.py:search_top_listings,
+        # used for design-style research), but isn't wired into this specific dimension yet --
+        # e.g. favorites-concentration across top results as a differentiation proxy. Left as
+        # a neutral placeholder rather than building an under-verified scoring heuristic.
+        differentiation_score = 0.50
 
         weighted_total = (
             demand_score * weights.get("demand_evidence", DEFAULT_WEIGHTS["demand_evidence"])
@@ -87,7 +121,8 @@ class OpportunityDecisionEngine(BaseAgent):
         rationale = (
             f"Weighted score {weighted_total:.2f} vs minimum {minimum:.2f}. "
             f"Demand evidence {'REAL (Google Trends)' if evidence.get('is_real_data') else 'UNAVAILABLE'}"
-            f"(score {demand_score:.2f}). Competitive data: {evidence.get('etsy_competition_data', 'n/a')}. "
+            f"(score {demand_score:.2f}). Competitive data (score {competition_score:.2f}): "
+            f"{evidence.get('etsy_competition_data', 'n/a')}. "
             f"Category defaults applied for profitability/feasibility/risk ({opportunity.category})."
         )
 

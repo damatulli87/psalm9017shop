@@ -2,13 +2,14 @@
 Market Intelligence Agent (spec section 5).
 
 Real signal: Google Trends interest-over-time via pytrends (no credentials
-needed). Etsy-specific competitive/pricing data requires an approved Etsy
-API app; until Etsy credentials are configured that dimension is marked
-BLOCKED and contributes zero confidence rather than a guess.
+needed), plus real Etsy market-saturation data (total active listing count
+per keyword) once Etsy is connected -- both real, never guessed; either
+being unavailable reduces confidence rather than being papered over.
 
 The candidate keyword list is a configurable seed (section 1's own product
 category examples) -- not a claim of market insight by itself. All actual
-"evidence" comes from the real trend fetch recorded per keyword.
+"evidence" comes from the real trend/competition fetches recorded per
+keyword.
 """
 from __future__ import annotations
 
@@ -17,6 +18,8 @@ from datetime import datetime, timedelta, timezone
 
 from app.agents.base import BaseAgent
 from app.config import settings
+from app.integrations import oauth_store
+from app.integrations.etsy import get_active_listing_count
 from app.integrations.trends import TrendSignal, fetch_trend_signal
 from app.models.models import MarketOpportunity, ResearchSource
 
@@ -26,6 +29,13 @@ from app.models.models import MarketOpportunity, ResearchSource
 # that do need a fresh fetch so we don't burst the limiter.
 TREND_CACHE_WINDOW = timedelta(hours=20)
 TREND_REQUEST_SPACING_SECONDS = 5.0
+
+# Etsy's v3 API is a sanctioned, authenticated API (generous published rate
+# limits), not an unofficial scrape like Trends, so no request spacing is
+# needed -- but still cache to avoid redundant real calls for the same
+# keyword across runs in a short window; listing-count saturation doesn't
+# meaningfully change hour to hour.
+ETSY_COMPETITION_CACHE_WINDOW = timedelta(hours=20)
 
 CANDIDATE_NICHES = [
     # Ordering matters: research_candidates() takes CANDIDATE_NICHES[:limit]
@@ -95,6 +105,44 @@ class MarketIntelligenceAgent(BaseAgent):
             .first()
         )
 
+    def _get_etsy_competition(self, keyword: str) -> tuple[int | None, bool]:
+        """Returns (listing_count, is_real). Cached first; if not cached and
+        Etsy is connected, makes a real call. None/False if Etsy isn't
+        connected or the real call fails -- never guessed."""
+        cutoff = datetime.now(timezone.utc) - ETSY_COMPETITION_CACHE_WINDOW
+        cached = (
+            self.db.query(ResearchSource)
+            .filter(
+                ResearchSource.name == f"Etsy competition: {keyword}",
+                ResearchSource.source_type == "etsy_competition",
+                ResearchSource.is_real_data.is_(True),
+                ResearchSource.retrieved_at >= cutoff,
+            )
+            .order_by(ResearchSource.retrieved_at.desc())
+            .first()
+        )
+        if cached:
+            return cached.raw_data.get("listing_count"), True
+
+        token = oauth_store.get_valid_etsy_token(self.db)
+        if not settings.etsy_configured or not token:
+            return None, False
+        try:
+            count = get_active_listing_count(keyword, access_token=token)
+        except Exception:  # noqa: BLE001
+            return None, False
+
+        source = ResearchSource(
+            name=f"Etsy competition: {keyword}",
+            source_type="etsy_competition",
+            is_real_data=True,
+            url=f"https://www.etsy.com/search?q={keyword.replace(' ', '%20')}",
+            raw_data={"listing_count": count},
+        )
+        self.db.add(source)
+        self.db.commit()
+        return count, True
+
     def research_candidates(self, workflow_run_id: int | None = None, limit: int = 5) -> list[MarketOpportunity]:
         opportunities: list[MarketOpportunity] = []
         made_a_real_call = False
@@ -142,17 +190,14 @@ class MarketIntelligenceAgent(BaseAgent):
                 self.db.commit()
                 self.db.refresh(source)
 
+            listing_count, etsy_real = self._get_etsy_competition(candidate["keyword"])
             etsy_note = (
-                "Etsy competitive/pricing data BLOCKED -- no Etsy API credentials configured. "
-                "Contributes 0 to differentiation/competition confidence until connected."
+                f"Real Etsy search: {listing_count:,} active listings match this keyword."
+                if etsy_real and listing_count is not None
+                else "Etsy competitive data BLOCKED -- no Etsy API credentials configured. "
+                     "Contributes 0 to competition confidence until connected."
                 if not settings.etsy_configured
-                # Real Etsy search (app/integrations/etsy.py:search_top_listings) exists now
-                # and is used for real design-style research in pod_production.py, but isn't
-                # wired into opportunity/competition SCORING here yet -- that's a real,
-                # separate feature (affects which niches get selected, not just the artwork
-                # of one already selected) that hasn't been asked for or built.
-                else "Etsy search is connected and used for real design-style research; "
-                     "not yet factored into this opportunity's competition score."
+                else "Real Etsy competition search failed for this keyword this run."
             )
 
             evidence = {
@@ -162,6 +207,8 @@ class MarketIntelligenceAgent(BaseAgent):
                 "trend_direction": signal.trend_direction,
                 "trend_error": signal.error,
                 "etsy_competition_data": etsy_note,
+                "etsy_listing_count": listing_count,
+                "etsy_competition_is_real": etsy_real,
             }
 
             opp = MarketOpportunity(

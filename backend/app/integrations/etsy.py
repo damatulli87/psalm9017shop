@@ -227,3 +227,18 @@ def search_top_listings(keyword: str, *, access_token: str, sample_size: int = 5
         {"title": r.get("title", ""), "tags": r.get("tags", []), "num_favorers": r.get("num_favorers", 0)}
         for r in results[:top_n]
     ]
+
+
+def get_active_listing_count(keyword: str, *, access_token: str) -> int:
+    """Real market-saturation signal for opportunity scoring: total active
+    Etsy listings matching keyword (not a sample -- Etsy's search response
+    includes the real total `count` regardless of `limit`). limit=1 to
+    keep this call cheap since only the count is used."""
+    resp = httpx.get(
+        f"{ETSY_API_BASE}/listings/active",
+        headers={"x-api-key": _api_key_header(), "Authorization": f"Bearer {access_token}"},
+        params={"keywords": keyword, "limit": 1},
+        timeout=15,
+    )
+    resp.raise_for_status()
+    return int(resp.json().get("count", 0))
