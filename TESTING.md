@@ -49,10 +49,35 @@ layer is a real independent check, not a rubber stamp:
 
 Last verified run: all 3 passed, including the deliberate-sabotage case.
 
+`backend/tests/test_order_fulfillment.py` -- added in direct response to the
+owner's directive that a buyer must never fail to receive what they paid
+for. Runs against the real test DB and the real policy/approval engine;
+only the actual network boundary is mocked (a real Etsy OAuth token and a
+real Printify production order can't be created in a test run):
+- `test_digital_order_with_real_file_is_marked_delivered` /
+  `_with_no_file_raises_concern_not_false_success` -- the real live bug
+  found this session (a digital Etsy listing can exist without ever having
+  had its file uploaded) must never be reported as delivered; the agent
+  verifies the real listing's `listing_type`/`file_data` before trusting
+  `product_type == "digital"`.
+- `test_pod_order_requires_real_approval_before_any_printify_call` /
+  `_submits_to_printify_only_after_owner_approves` /
+  `_rejected_by_owner_never_reaches_printify` -- confirms `submit_order()`
+  is physically unreachable until a real `pod_paid_production_order`
+  approval is granted (asserts by raising if called early), and that a real
+  approval correctly triggers it via `decide_approval()` →
+  `resume_after_approval()`, with the real buyer address correctly mapped.
+- `test_check_for_new_orders_is_idempotent_on_repeat_calls` -- a repeated
+  scheduler run must never double-process the same real Etsy receipt into
+  two orders/sales.
+
+Last verified run: all 6 passed. **Not covered by any test, deliberately:**
+a real end-to-end call to `printify.submit_order()` against the live API --
+doing so would place a real, costly production order and attempt a real
+shipment with no real buyer behind it.
+
 ## What's NOT built yet
 
-- **Required POD test** (spec section 33): not runnable -- POD production
-  agent doesn't exist yet (see PROGRESS.md).
 - Unit tests for individual agents/generators in isolation (today they're
   only exercised via the e2e test).
 - API/integration tests for every router (auth, approvals, financials,

@@ -171,3 +171,61 @@ def delete_product(shop_id: str, product_id: str) -> bool:
     cost/mockup data and was rejected before ever being listed."""
     resp = httpx.delete(f"{PRINTIFY_API_BASE}/shops/{shop_id}/products/{product_id}.json", headers=_headers(), timeout=15)
     return resp.status_code < 300
+
+
+@dataclass
+class PrintifyOrderResult:
+    success: bool
+    order_id: str | None
+    detail: str
+    raw: dict = field(default_factory=dict)
+
+
+def submit_order(
+    shop_id: str,
+    *,
+    external_id: str,
+    product_id: str,
+    variant_id: int,
+    quantity: int,
+    address_to: dict,
+) -> PrintifyOrderResult:
+    """Submits a REAL order -- confirmed via Printify's own docs: new shops
+    default to automatic order approval (production starts without a
+    separate confirmation call), so this is not a draft/preview action,
+    it's a real commitment to print and ship. `external_id` should be our
+    own Order.id so a retried call is idempotent on Printify's side rather
+    than creating a duplicate physical order (confirmed required+unique
+    via the real submitOrderRequest schema). `address_to` real fields:
+    first_name, last_name, address1, address2, city, region, zip, country,
+    email, phone (per Printify's real addressTo schema)."""
+    payload = {
+        "external_id": external_id,
+        "line_items": [{"product_id": product_id, "variant_id": variant_id, "quantity": quantity}],
+        "address_to": address_to,
+    }
+    try:
+        resp = httpx.post(
+            f"{PRINTIFY_API_BASE}/shops/{shop_id}/orders.json", headers=_headers(), json=payload, timeout=30,
+        )
+        resp.raise_for_status()
+        data = resp.json()
+        return PrintifyOrderResult(
+            success=True, order_id=str(data.get("id")), detail="Real order submitted to Printify.", raw=data,
+        )
+    except httpx.HTTPStatusError as exc:
+        return PrintifyOrderResult(
+            success=False, order_id=None, detail=f"Printify order submission failed: {exc.response.status_code} {exc.response.text}",
+        )
+    except Exception as exc:  # noqa: BLE001
+        return PrintifyOrderResult(success=False, order_id=None, detail=f"Printify order submission failed: {exc}")
+
+
+def get_order_status(shop_id: str, order_id: str) -> dict | None:
+    """Real post-submission check -- used to verify an order didn't land in
+    a bad state (on-hold, unfulfillable, has-issues) rather than assuming
+    success just because submit_order() returned 200."""
+    resp = httpx.get(f"{PRINTIFY_API_BASE}/shops/{shop_id}/orders/{order_id}.json", headers=_headers(), timeout=15)
+    if resp.status_code >= 400:
+        return None
+    return resp.json()

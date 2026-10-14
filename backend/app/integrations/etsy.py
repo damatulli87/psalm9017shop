@@ -285,3 +285,38 @@ def get_active_listing_count(keyword: str, *, access_token: str) -> int:
     )
     resp.raise_for_status()
     return int(resp.json().get("count", 0))
+
+
+def list_recent_paid_receipts(*, access_token: str, limit: int = 25) -> list[dict]:
+    """Real orders: GET /shops/{shop_id}/receipts, was_paid=true so unpaid/
+    abandoned carts never trigger fulfillment, sorted newest first. Each
+    receipt's real schema (confirmed live, 2026-10-14) includes shipping
+    address fields (name/first_line/second_line/city/state/zip/country_iso),
+    buyer_email, and a `transactions` array with listing_id/is_digital/
+    quantity/variations per line item -- everything order_fulfillment.py
+    needs to tell a real digital sale (Etsy handles delivery itself once
+    the file is attached, see etsy_manager.py) from a real POD sale
+    (needs a real Printify order submitted)."""
+    resp = httpx.get(
+        f"{ETSY_API_BASE}/shops/{settings.etsy_shop_id}/receipts",
+        headers={"x-api-key": _api_key_header(), "Authorization": f"Bearer {access_token}"},
+        params={"was_paid": "true", "limit": limit, "sort_on": "created", "sort_order": "desc"},
+        timeout=20,
+    )
+    resp.raise_for_status()
+    return resp.json().get("results", [])
+
+
+def get_listing(listing_id: str, *, access_token: str) -> dict | None:
+    """Real listing state, used to verify a digital order actually has its
+    file attached (listing_type == "download") before trusting that Etsy
+    will deliver it -- not just assuming because product.product_type
+    says "digital"."""
+    resp = httpx.get(
+        f"{ETSY_API_BASE}/listings/{listing_id}",
+        headers={"x-api-key": _api_key_header(), "Authorization": f"Bearer {access_token}"},
+        timeout=15,
+    )
+    if resp.status_code >= 400:
+        return None
+    return resp.json()

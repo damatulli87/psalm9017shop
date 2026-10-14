@@ -318,8 +318,15 @@ def _publish(db: Session, run: WorkflowRun, listing: MarketplaceListing) -> None
 
 def resume_after_approval(db: Session, approval_id: int) -> WorkflowRun | None:
     """Call after an owner decides an approval. If approved and it was a publish_listing
-    action, completes the paused workflow's publication stage."""
+    action, completes the paused workflow's publication stage. A
+    pod_paid_production_order approval isn't tied to a WorkflowRun at all
+    (it's a real order being fulfilled, not a pipeline run), so it's
+    dispatched to order_fulfillment.py instead and this returns None."""
     approval = db.query(Approval).filter(Approval.id == approval_id).first()
+    if approval and approval.action_type == "pod_paid_production_order":
+        from app.agents.order_fulfillment import resume_pod_fulfillment
+        resume_pod_fulfillment(db, approval)
+        return None
     if not approval or approval.action_type != "publish_listing":
         return None
 

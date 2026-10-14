@@ -110,9 +110,16 @@ def job_daily_integration_health() -> None:
 def job_daily_order_monitor() -> None:
     if not _is_enabled("daily_order_monitor"):
         return
-    # No storefront is connected yet in a fresh deployment, so there is nothing real to poll.
-    # Once Etsy/Shopify credentials are configured this calls the real orders endpoint.
-    _mark_run("daily_order_monitor", "skipped_no_storefront_connected")
+    db = SessionLocal()
+    try:
+        from app.agents.order_fulfillment import OrderFulfillmentAgent
+
+        result = OrderFulfillmentAgent(db).check_for_new_orders()
+        _mark_run("daily_order_monitor", f"success: {result}")
+    except Exception as exc:  # noqa: BLE001
+        _mark_run("daily_order_monitor", f"error: {exc}")
+    finally:
+        db.close()
 
 
 def job_weekly_opportunity_selection() -> None:

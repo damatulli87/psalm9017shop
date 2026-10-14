@@ -110,6 +110,19 @@ AGENT_ROSTER = [
         "tools": ["etsy_adapter"],
     },
     {
+        "key": "order_fulfillment",
+        "name": "Order Fulfillment Agent",
+        "responsibility": "Detects real paid orders and ensures the buyer actually receives what they purchased -- digital delivery via Etsy, physical production/shipping via Printify.",
+        "system_prompt": (
+            "You check for real paid orders and make sure every one is fulfilled: digital orders are delivered "
+            "automatically by Etsy once the file is attached, so you verify that happened; physical (POD) orders "
+            "require you to submit a real production order to Printify with the buyer's real shipping address. "
+            "You never fabricate a fulfillment status -- if something can't be confirmed, you say so and raise it "
+            "rather than marking an order fulfilled on assumption."
+        ),
+        "tools": ["etsy_adapter", "printify_adapter"],
+    },
+    {
         "key": "shopify_manager",
         "name": "Shopify Store Management Agent",
         "responsibility": "Manages Shopify products/orders once the owner activates Shopify expansion.",
